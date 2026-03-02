@@ -21,8 +21,9 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { mkdir, writeFile, access } from "node:fs/promises";
 import bs58 from "bs58";
-import { NaraSDK } from "../../client";
-import { DEFAULT_WALLET_PATH as _DEFAULT_WALLET_PATH } from "../../constants";
+import { NaraSDK } from "nara-sdk";
+
+const _DEFAULT_WALLET_PATH = process.env.WALLET_PATH || "~/.config/nara/id.json";
 import { loadWallet, getRpcUrl } from "../utils/wallet";
 import { validatePublicKey, validatePositiveNumber } from "../utils/validation";
 import {

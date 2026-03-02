@@ -5,7 +5,9 @@
 import { Keypair } from "@solana/web3.js";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { DEFAULT_RPC_URL, DEFAULT_WALLET_PATH as _DEFAULT_WALLET_PATH } from "../../constants";
+import { DEFAULT_RPC_URL } from "nara-sdk";
+
+const _DEFAULT_WALLET_PATH = process.env.WALLET_PATH || "~/.config/nara/id.json";
 
 /**
  * Resolve wallet path (expand ~ to home directory)

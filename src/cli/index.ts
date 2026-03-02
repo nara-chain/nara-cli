@@ -18,7 +18,7 @@ import {
   handleTransferToken,
 } from "./commands/wallet";
 import { loadWallet, getRpcUrl } from "./utils/wallet";
-import { NaraSDK } from "../client";
+import { NaraSDK } from "nara-sdk";
 import { printError, printInfo, printSuccess } from "./utils/output";
 import type {
   GlobalOptions,

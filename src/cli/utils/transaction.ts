@@ -8,7 +8,7 @@ import {
   Keypair,
   Connection,
 } from "@solana/web3.js";
-import { NaraSDK } from "../../client";
+import { NaraSDK } from "nara-sdk";
 import { printInfo, printSuccess } from "./output";
 
 /**

@@ -13,7 +13,6 @@ import {
   printWarning,
 } from "../utils/output";
 import type { GlobalOptions } from "../types";
-import { DEFAULT_QUEST_RELAY_URL } from "../../constants";
 import {
   getQuestInfo,
   hasAnswered,
@@ -21,7 +20,9 @@ import {
   submitAnswer,
   submitAnswerViaRelay,
   parseQuestReward,
-} from "../../quest";
+} from "nara-sdk";
+
+const DEFAULT_QUEST_RELAY_URL = process.env.QUEST_RELAY_URL || "https://quest-api.nara.build/";
 
 // ─── Anchor error parsing ────────────────────────────────────────
 const QUEST_ERRORS: Record<number, string> = {
