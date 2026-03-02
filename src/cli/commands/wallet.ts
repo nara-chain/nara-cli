@@ -135,7 +135,7 @@ export async function handleWalletBalance(
     console.log(JSON.stringify(output, null, 2));
   } else {
     console.log(`\nWallet: ${pubkey.toBase58()}`);
-    console.log(`Balance: ${balanceSOL.toFixed(4)} NSO (${balance.toLocaleString()} lamports)`);
+    console.log(`Balance: ${balanceSOL.toFixed(4)} NARA (${balance.toLocaleString()} lamports)`);
   }
 }
 
@@ -298,7 +298,7 @@ export async function handleTxStatus(
       console.log(`Time: ${date.toISOString()}`);
     }
     if (output.fee) {
-      console.log(`Fee: ${output.fee / LAMPORTS_PER_SOL} NSO`);
+      console.log(`Fee: ${output.fee / LAMPORTS_PER_SOL} NARA`);
     }
     if (output.error) {
       console.log(`Error: ${JSON.stringify(output.error)}`);
@@ -333,7 +333,7 @@ export async function handleTransferSol(
   const lamports = Math.floor(amountSOL * LAMPORTS_PER_SOL);
 
   printInfo(`To: ${recipient.toBase58()}`);
-  printInfo(`Amount: ${amountSOL} NSO`);
+  printInfo(`Amount: ${amountSOL} NARA`);
 
   // Initialize SDK
   const sdk = new NaraSDK({
@@ -381,7 +381,7 @@ export async function handleTransferSol(
     console.log(`\nTransfer Details:`);
     console.log(`  From: ${wallet.publicKey.toBase58()}`);
     console.log(`  To: ${recipient.toBase58()}`);
-    console.log(`  Amount: ${amountSOL} NSO`);
+    console.log(`  Amount: ${amountSOL} NARA`);
     printTransactionResult(txResult, false);
   }
 }

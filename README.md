@@ -25,10 +25,10 @@ Wallet is saved to `~/.config/nara/id.json` by default.
 
 ```text
 address                              Show wallet address
-balance [address]                    Check NSO balance
+balance [address]                    Check NARA balance
 token-balance <token-address>        Check token balance
 tx-status <signature>                Check transaction status
-transfer <to> <amount>               Transfer NSO
+transfer <to> <amount>               Transfer NARA
 transfer-token <token> <to> <amount> Transfer tokens
 sign <base64-tx> [--send]            Sign (and optionally send) a transaction
 wallet create                        Create a new wallet

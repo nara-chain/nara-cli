@@ -83,7 +83,7 @@ export function registerCommands(program: Command): void {
   // Top-level: balance
   program
     .command("balance")
-    .description("Check NSO balance")
+    .description("Check NARA balance")
     .argument("[address]", "Wallet address (optional, defaults to current wallet)")
     .action(async (address: string | undefined) => {
       const opts = program.opts() as WalletBalanceOptions;
@@ -127,7 +127,7 @@ export function registerCommands(program: Command): void {
   // Top-level: transfer
   program
     .command("transfer <to> <amount>")
-    .description("Transfer NSO to another wallet")
+    .description("Transfer NARA to another wallet")
     .option("-e, --export-tx", "Export unsigned transaction", false)
     .action(async (to: string, amount: string, options: { exportTx?: boolean }) => {
       const opts = program.opts() as TransferSolOptions;
@@ -148,7 +148,7 @@ export function registerCommands(program: Command): void {
     .action(async (tokenAddress: string, to: string, amount: string, options: { decimals?: string; exportTx?: boolean }) => {
       const opts = program.opts() as TransferTokenOptions;
       try {
-        await handleTransferToken(tokenAddress, to, amount, { ...opts, ...options });
+        await handleTransferToken(tokenAddress, to, amount, { ...opts, decimals: options.decimals ? parseInt(options.decimals) : undefined, exportTx: options.exportTx });
       } catch (error: any) {
         printError(error.message);
         process.exit(1);
