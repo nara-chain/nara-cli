@@ -1,6 +1,6 @@
 {
   "name": "naracli",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "description": "CLI for the Nara chain (Solana-compatible)",
   "module": "index.ts",
   "main": "index.ts",
