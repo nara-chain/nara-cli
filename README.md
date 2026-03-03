@@ -49,7 +49,7 @@ Wallet is saved to `~/.config/nara/id.json` by default.
 | `quest get` | Get current quest info |
 | `quest answer <answer>` | Submit answer with ZK proof |
 
-### Skills Hub
+### Skills Hub — Registry (on-chain)
 
 | Command | Description |
 | ------- | ----------- |
@@ -62,6 +62,21 @@ Wallet is saved to `~/.config/nara/id.json` by default.
 | `skills transfer <name> <new-authority>` | Transfer skill authority to a new address |
 | `skills close-buffer <name>` | Close a pending upload buffer and reclaim rent |
 | `skills delete <name>` | Delete a skill and reclaim all rent |
+
+### Skills Hub — Local Install
+
+Pull skill content from the chain and write it to your AI-agent skill directories
+(Claude Code, Cursor, OpenCode, Codex, Amp). Follows the [agentskills.io](https://agentskills.io) layout.
+
+| Command | Description |
+| ------- | ----------- |
+| `skills add <name>` | Install a skill from the chain into local agent directories |
+| `skills remove <name>` | Remove a locally installed skill |
+| `skills list` | List skills installed via naracli |
+| `skills check` | Check installed skills for available chain updates |
+| `skills update [names...]` | Update installed skills to the latest chain version |
+
+**Options** (add / remove / update): `-g, --global` — install to `~/<agent>/skills/` instead of project-local · `-a, --agent <agents...>` — target specific agents
 
 ### ZK Identity
 
@@ -95,11 +110,17 @@ npx naracli balance
 npx naracli quest get
 npx naracli quest answer "your answer"
 
-# Register and populate a skill
+# Publish a skill to the chain
 npx naracli skills register my-skill "Alice"
 npx naracli skills set-description my-skill "What this skill does"
-npx naracli skills upload my-skill ./skill.md
-npx naracli skills get my-skill
+npx naracli skills upload my-skill ./SKILL.md
+
+# Install from the chain into local agent directories
+npx naracli skills add my-skill
+npx naracli skills add my-skill --global --agent claude-code
+npx naracli skills list
+npx naracli skills check
+npx naracli skills update
 
 # ZK anonymous transfers
 npx naracli zkid create my-id

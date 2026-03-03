@@ -5,6 +5,8 @@
 import { Command } from "commander";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { readFile } from "node:fs/promises";
+import * as p from "@clack/prompts";
+import pc from "picocolors";
 import { loadWallet, getRpcUrl } from "../utils/wallet";
 import {
   printError,
@@ -24,6 +26,13 @@ import {
   deleteSkill,
   closeBuffer,
 } from "nara-sdk";
+import {
+  handleSkillsAdd,
+  handleSkillsRemove,
+  handleSkillsList,
+  handleSkillsCheck,
+  handleSkillsUpdate,
+} from "./skillsInstall";
 
 // ─── Command handlers ────────────────────────────────────────────
 
@@ -229,18 +238,38 @@ async function handleSkillsCloseBuffer(name: string, options: GlobalOptions) {
   }
 }
 
-async function handleSkillsDelete(name: string, options: GlobalOptions) {
+async function handleSkillsDelete(name: string, options: GlobalOptions & { yes?: boolean }) {
+  if (!options.json && !options.yes && process.stdin.isTTY) {
+    console.log();
+    p.intro(pc.bgRed(pc.white(" skills delete ")));
+    p.log.warn(
+      pc.yellow("This will permanently delete the skill from the blockchain.\n") +
+      pc.dim("  · On-chain data and content will be erased\n") +
+      pc.dim("  · This action cannot be undone")
+    );
+
+    const confirmed = await p.confirm({
+      message: `Delete skill ${pc.cyan(name)} from the blockchain?`,
+      initialValue: false,
+    });
+
+    if (p.isCancel(confirmed) || !confirmed) {
+      p.cancel("Deletion cancelled");
+      process.exit(0);
+    }
+  }
+
   const rpcUrl = getRpcUrl(options.rpcUrl);
   const connection = new Connection(rpcUrl, "confirmed");
   const wallet = await loadWallet(options.wallet);
 
-  printInfo(`Deleting skill "${name}"...`);
+  if (!options.json) printInfo(`Deleting skill "${name}"...`);
   const signature = await deleteSkill(connection, wallet, name);
-  printSuccess("Skill deleted and rent reclaimed!");
 
   if (options.json) {
     formatOutput({ name, signature }, true);
   } else {
+    printSuccess("Skill deleted and rent reclaimed!");
     console.log(`  Transaction: ${signature}`);
   }
 }
@@ -369,10 +398,91 @@ export function registerSkillsCommands(program: Command): void {
   skills
     .command("delete <name>")
     .description("Delete a skill and reclaim all rent")
-    .action(async (name: string, _opts: any, cmd: Command) => {
+    .option("-y, --yes", "Skip confirmation prompt")
+    .action(async (name: string, opts: { yes?: boolean }, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
-        await handleSkillsDelete(name, globalOpts);
+        await handleSkillsDelete(name, { ...globalOpts, ...opts });
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // ─── Local install management ─────────────────────────────────
+
+  // skills add
+  skills
+    .command("add <name>")
+    .description("Install a skill from the chain into local agent directories")
+    .option("-g, --global", "Install globally (~/<agent>/skills/) instead of project-local")
+    .option("-a, --agent <agents...>", "Target specific agents (e.g. claude-code cursor)")
+    .action(async (name: string, opts: { global?: boolean; agent?: string[] }, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleSkillsAdd(name, { ...globalOpts, ...opts });
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // skills remove
+  skills
+    .command("remove <name>")
+    .description("Remove a locally installed skill")
+    .option("-g, --global", "Remove from global scope")
+    .option("-a, --agent <agents...>", "Remove from specific agents only")
+    .action(async (name: string, opts: { global?: boolean; agent?: string[] }, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleSkillsRemove(name, { ...globalOpts, ...opts });
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // skills list
+  skills
+    .command("list")
+    .description("List skills installed via naracli")
+    .option("-g, --global", "List global skills instead of project-local")
+    .action(async (opts: { global?: boolean }, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleSkillsList({ ...globalOpts, ...opts });
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // skills check
+  skills
+    .command("check")
+    .description("Check installed skills for available chain updates")
+    .option("-g, --global", "Check global skills")
+    .action(async (opts: { global?: boolean }, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleSkillsCheck({ ...globalOpts, ...opts });
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // skills update
+  skills
+    .command("update [names...]")
+    .description("Update installed skills to the latest chain version")
+    .option("-g, --global", "Update global skills")
+    .option("-a, --agent <agents...>", "Target specific agents")
+    .action(async (names: string[], opts: { global?: boolean; agent?: string[] }, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleSkillsUpdate(names, { ...globalOpts, ...opts });
       } catch (error: any) {
         printError(error.message);
         process.exit(1);
