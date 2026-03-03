@@ -9,6 +9,8 @@ import {
 } from "@solana/web3.js";
 import { registerWalletCommands } from "./commands/wallet";
 import { registerQuestCommands } from "./commands/quest";
+import { registerSkillsCommands } from "./commands/skills";
+import { registerZkIdCommands } from "./commands/zkid";
 import {
   handleWalletAddress,
   handleWalletBalance,
@@ -65,6 +67,12 @@ export function registerCommands(program: Command): void {
 
   // quest
   registerQuestCommands(program);
+
+  // skills
+  registerSkillsCommands(program);
+
+  // zkid
+  registerZkIdCommands(program);
 
   // Top-level: address
   program
