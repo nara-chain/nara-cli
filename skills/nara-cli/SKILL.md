@@ -49,8 +49,8 @@ tx-status <signature>                               # Check transaction status
 transfer <to> <amount> [-e]                         # Transfer NARA
 transfer-token <token> <to> <amount> [--decimals 6] [-e]  # Transfer tokens
 sign <base64-tx> [--send]                           # Sign a base64-encoded transaction
-wallet create                                       # Create new wallet
-wallet import [-m <mnemonic>] [-k <key>]            # Import wallet
+wallet create [-o <path>]                           # Create new wallet
+wallet import [-m <mnemonic>] [-k/--private-key <key>] [-o <path>]  # Import wallet
 quest get                                           # Get current quest info
 quest answer <answer> [--relay [url]]               # Submit answer with ZK proof
 ```
