@@ -4,10 +4,10 @@
 
 import { Command } from "commander";
 import { registerCommands } from "../src/cli/index";
-import { createRequire } from "node:module";
-
-const require = createRequire(import.meta.url);
-const { version } = require("../package.json");
+// __CLI_VERSION__ is injected by the build script via esbuild --define.
+// In dev mode (tsx), fall back to "dev".
+declare const __CLI_VERSION__: string;
+const version = typeof __CLI_VERSION__ !== "undefined" ? __CLI_VERSION__ : "dev";
 
 // Create program
 const program = new Command();

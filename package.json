@@ -11,7 +11,7 @@
   },
   "scripts": {
     "cli": "node --require ./bin/env-loader.cjs --import tsx bin/nara-cli.ts",
-    "build": "npx esbuild bin/nara-cli.ts --bundle --platform=node --format=esm --outfile=dist/nara-cli.mjs --external:@solana/web3.js --external:@solana/spl-token --external:@coral-xyz/anchor --external:bip39 --external:bs58 --external:bn.js --external:commander --external:ed25519-hd-key --external:snarkjs && printf '#!/usr/bin/env node\\nconst _w=console.warn;console.warn=(...a)=>{if(String(a[0]).includes(\"bigint\"))return;_w(...a)};\\ntry{process.loadEnvFile()}catch{}\\nimport(\"./nara-cli.mjs\");\\n' > dist/naracli.cjs",
+    "build": "node scripts/build.cjs",
     "test": "node --import tsx --test --experimental-test-isolation=none --test-reporter spec src/tests/skills.test.ts src/tests/zkid.test.ts",
     "test:e2e": "node --import tsx --test --experimental-test-isolation=none --test-reporter spec src/tests/*.e2e.test.ts",
     "prepublishOnly": "npm run build"
