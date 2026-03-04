@@ -87,6 +87,7 @@ async function handleQuestGet(options: GlobalOptions) {
     round: quest.round,
     questionId: quest.questionId,
     question: quest.question,
+    difficulty: quest.difficulty,
     rewardPerWinner: `${quest.rewardPerWinner} NARA`,
     totalReward: `${quest.totalReward} NARA`,
     rewardSlots: `${quest.winnerCount}/${quest.rewardCount}`,
@@ -102,6 +103,7 @@ async function handleQuestGet(options: GlobalOptions) {
     console.log("");
     console.log(`  Question: ${quest.question}`);
     console.log(`  Round: #${quest.round}`);
+    console.log(`  Difficulty: ${quest.difficulty}`);
     console.log(`  Reward per winner: ${quest.rewardPerWinner} NARA`);
     console.log(`  Total reward: ${quest.totalReward} NARA`);
     console.log(
@@ -120,8 +122,10 @@ async function handleQuestGet(options: GlobalOptions) {
 // ─── Command: quest answer ───────────────────────────────────────
 async function handleQuestAnswer(
   answer: string,
-  options: GlobalOptions & { relay?: string }
+  options: GlobalOptions & { relay?: string; agent?: string; model?: string }
 ) {
+  const agent = options.agent ?? "naracli";
+  const model = options.model ?? "";
   const rpcUrl = getRpcUrl(options.rpcUrl);
   const connection = new Connection(rpcUrl, "confirmed");
   const wallet = await loadWallet(options.wallet);
@@ -182,7 +186,9 @@ async function handleQuestAnswer(
       const relayResult = await submitAnswerViaRelay(
         options.relay,
         wallet.publicKey,
-        proof.hex
+        proof.hex,
+        agent,
+        model
       );
       printSuccess("Answer submitted via relay!");
       console.log(`  Transaction: ${relayResult.txHash}`);
@@ -195,7 +201,7 @@ async function handleQuestAnswer(
     // Direct on-chain submission
     printInfo("Submitting answer...");
     try {
-      const result = await submitAnswer(connection, wallet, proof.solana);
+      const result = await submitAnswer(connection, wallet, proof.solana, agent, model);
       printSuccess("Answer submitted!");
       console.log(`  Transaction: ${result.signature}`);
       await handleReward(connection, result.signature, options);
@@ -300,11 +306,13 @@ export function registerQuestCommands(program: Command): void {
     .command("answer <answer>")
     .description("Submit an answer")
     .option("--relay [url]", `Submit via relay service, gasless (default: ${DEFAULT_QUEST_RELAY_URL})`)
+    .option("--agent <name>", "Agent identifier (default: naracli)")
+    .option("--model <name>", "Model identifier")
     .action(async (answer: string, opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
         const relayUrl = opts.relay === true ? DEFAULT_QUEST_RELAY_URL : opts.relay;
-        await handleQuestAnswer(answer, { ...globalOpts, relay: relayUrl });
+        await handleQuestAnswer(answer, { ...globalOpts, relay: relayUrl, agent: opts.agent, model: opts.model });
       } catch (error: any) {
         printError(error.message);
         process.exit(1);
