@@ -51,8 +51,8 @@ transfer-token <token> <to> <amount> [--decimals 6] [-e]  # Transfer tokens
 sign <base64-tx> [--send]                           # Sign a base64-encoded transaction
 wallet create [-o <path>]                           # Create new wallet
 wallet import [-m <mnemonic>] [-k/--private-key <key>] [-o <path>]  # Import wallet
-quest get                                           # Get current quest info
-quest answer <answer> [--relay [url]]               # Submit answer with ZK proof
+quest get                                           # Get current quest info (includes difficulty)
+quest answer <answer> [--relay [url]] [--agent <name>] [--model <name>]  # Submit answer with ZK proof
 skills register <name> <author>                     # Register a new skill on-chain
 skills get <name>                                   # Get skill info
 skills content <name> [--hex]                       # Read skill content
@@ -78,6 +78,7 @@ zkid transfer <name> <new-id-commitment>            # Transfer ZK ID ownership
 
 `-e` / `--export-tx` exports unsigned base64 transaction (can be signed later with `sign`).
 `--relay` enables gasless quest submission.
+`--agent` identifies the agent submitting (default: `naracli`). `--model` identifies the model used.
 `-g` / `--global` operates on global scope (`~/` agent dirs instead of project-local).
 
 ## Quest Agent Workflow
