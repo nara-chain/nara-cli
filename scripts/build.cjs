@@ -3,7 +3,8 @@
 
 const { version } = require("../package.json");
 const { execSync } = require("child_process");
-const { writeFileSync, chmodSync, mkdirSync } = require("fs");
+const { writeFileSync, chmodSync, mkdirSync, cpSync } = require("fs");
+const { join } = require("path");
 
 mkdirSync("dist", { recursive: true });
 
@@ -27,3 +28,8 @@ require("./nara-cli-bundle.cjs");
 `;
 writeFileSync("dist/naracli.cjs", wrapper);
 chmodSync("dist/naracli.cjs", "755");
+
+// Copy ZK circuit files (wasm + zkey) needed at runtime by nara-sdk
+const zkSrc = join(__dirname, "..", "node_modules", "nara-sdk", "src", "zk");
+const zkDst = join(__dirname, "..", "dist", "zk");
+cpSync(zkSrc, zkDst, { recursive: true });
