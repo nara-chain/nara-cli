@@ -28,10 +28,12 @@ import {
 } from "nara-sdk";
 import { readFileSync } from "node:fs";
 import { addAgentId } from "../utils/agent-config";
+import { validateName } from "../utils/validation";
 
 // ─── Command handlers ────────────────────────────────────────────
 
 async function handleAgentRegister(agentId: string, options: GlobalOptions) {
+  validateName(agentId, "Agent ID");
   const rpcUrl = getRpcUrl(options.rpcUrl);
   const connection = new Connection(rpcUrl, "confirmed");
   const wallet = await loadWallet(options.wallet);

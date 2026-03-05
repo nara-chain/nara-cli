@@ -33,6 +33,7 @@ import {
   handleSkillsCheck,
   handleSkillsUpdate,
 } from "./skillsInstall";
+import { validateName } from "../utils/validation";
 
 // ─── Command handlers ────────────────────────────────────────────
 
@@ -41,6 +42,7 @@ async function handleSkillsRegister(
   author: string,
   options: GlobalOptions
 ) {
+  validateName(name, "Skill name");
   const rpcUrl = getRpcUrl(options.rpcUrl);
   const connection = new Connection(rpcUrl, "confirmed");
   const wallet = await loadWallet(options.wallet);

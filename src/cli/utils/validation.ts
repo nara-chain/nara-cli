@@ -67,6 +67,20 @@ export function validateNonNegativeNumber(
 }
 
 /**
+ * Validate that a name contains only lowercase letters, numbers, and hyphens,
+ * and starts with a lowercase letter.
+ * Used for agent IDs and skill names.
+ */
+export function validateName(value: string, label: string): string {
+  if (!/^[a-z][a-z0-9-]*$/.test(value)) {
+    throw new Error(
+      `${label} must start with a lowercase letter and contain only lowercase letters, numbers, and hyphens`
+    );
+  }
+  return value;
+}
+
+/**
  * Validate required option
  * @param value Option value
  * @param name Option name

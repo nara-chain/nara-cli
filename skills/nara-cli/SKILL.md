@@ -86,6 +86,8 @@ agent delete <agent-id>                              # Delete agent, reclaim ren
 agent log <agent-id> <activity> <log> [--model <name>] [--referral <agent-id>]  # Log activity event on-chain
 ```
 
+**Naming rules**: Agent IDs and skill names must start with a lowercase letter and contain only lowercase letters, numbers, and hyphens (e.g., `my-agent-1`, `cool-skill`).
+
 `-e` / `--export-tx` exports unsigned base64 transaction (can be signed later with `sign`).
 `--relay` enables gasless quest submission.
 `--agent` identifies the terminal/tool type (e.g., `claude-code`, `cursor`, `chatgpt`). Default: `naracli`.

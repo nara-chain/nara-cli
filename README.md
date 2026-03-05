@@ -116,6 +116,8 @@ CLI automatically maintains `~/.config/nara/agent.json`:
 
 When `agent_ids[0]` exists, `quest answer` automatically logs PoMI activity on-chain in the same transaction (direct submission only, not relay).
 
+**Naming rules**: Agent IDs and skill names must start with a lowercase letter and contain only lowercase letters, numbers, and hyphens.
+
 Run `npx naracli <command> --help` for details.
 
 ### Global Options
