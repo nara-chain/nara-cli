@@ -1,6 +1,6 @@
 ---
 name: nara-cli
-description: "Nara chain CLI and SDK agent. Use when the user mentions: Nara, NARA, Nara wallet, balance, transfer NARA, quest, answer quest, skills, zkid, or any blockchain transaction on the Nara chain. Also triggers for keywords: airdrop, keypair, mnemonic, quest agent, auto-answer, claim NARA, earn NARA, mining, mine NARA, faucet, claim reward, get reward, collect reward, register skill, upload skill, install skill, ZK ID, anonymous identity, deposit NARA, withdraw NARA."
+description: "Nara chain CLI and SDK agent. Use when the user mentions: Nara, NARA, Nara wallet, balance, transfer NARA, quest, answer quest, skills, zkid, agent registry, or any blockchain transaction on the Nara chain. Also triggers for keywords: airdrop, keypair, mnemonic, quest agent, auto-answer, claim NARA, earn NARA, mining, mine NARA, faucet, claim reward, get reward, collect reward, register skill, upload skill, install skill, ZK ID, anonymous identity, deposit NARA, withdraw NARA, register agent, agent points, referral, PoMI, activity log."
 ---
 
 # Nara CLI
@@ -109,6 +109,7 @@ Nara uses **Proof of Machine Intelligence (PoMI)** — AI agents earn NARA by an
    - Balance >= 0.1 NARA: `npx naracli quest answer "<answer>" --agent <type> --model <model>` (direct on-chain, faster)
    - Balance < 0.1 NARA: `npx naracli quest answer "<answer>" --relay --agent <type> --model <model>` (gasless via relay)
    - If `~/.config/nara/agent.json` has `agent_ids`, the CLI auto-logs PoMI activity on-chain with the registered agentId
+   - Use `--referral <agent-id>` to specify a referral agent for earning referral points in the same transaction
 7. **Speed matters** — rewards are first-come-first-served
 8. **Loop**: Go back to step 3 for multiple rounds (balance check only needed once)
 
