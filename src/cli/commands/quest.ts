@@ -20,7 +20,9 @@ import {
   submitAnswer,
   submitAnswerViaRelay,
   parseQuestReward,
+  type ActivityLog,
 } from "nara-sdk";
+import { loadAgentConfig } from "../utils/agent-config";
 
 const DEFAULT_QUEST_RELAY_URL = process.env.QUEST_RELAY_URL || "https://quest-api.nara.build/";
 
@@ -122,13 +124,15 @@ async function handleQuestGet(options: GlobalOptions) {
 // ─── Command: quest answer ───────────────────────────────────────
 async function handleQuestAnswer(
   answer: string,
-  options: GlobalOptions & { relay?: string; agent?: string; model?: string }
+  options: GlobalOptions & { relay?: string; agent?: string; model?: string; referral?: string }
 ) {
-  const agent = options.agent ?? "naracli";
-  const model = options.model ?? "";
   const rpcUrl = getRpcUrl(options.rpcUrl);
   const connection = new Connection(rpcUrl, "confirmed");
   const wallet = await loadWallet(options.wallet);
+  const agentConfig = await loadAgentConfig();
+  const configAgentId = agentConfig.agent_ids[0];
+  const agent = options.agent ?? "naracli";
+  const model = options.model ?? "";
 
   // 1. Fetch quest info
   let quest;
@@ -201,7 +205,11 @@ async function handleQuestAnswer(
     // Direct on-chain submission
     printInfo("Submitting answer...");
     try {
-      const result = await submitAnswer(connection, wallet, proof.solana, agent, model);
+      let activityLog: ActivityLog | undefined;
+      if (configAgentId) {
+        activityLog = { agentId: configAgentId, activity: "PoMI", model, log: "", referralAgentId: options.referral };
+      }
+      const result = await submitAnswer(connection, wallet, proof.solana, agent, model, undefined, activityLog);
       printSuccess("Answer submitted!");
       console.log(`  Transaction: ${result.signature}`);
       await handleReward(connection, result.signature, options);
@@ -308,11 +316,12 @@ export function registerQuestCommands(program: Command): void {
     .option("--relay [url]", `Submit via relay service, gasless (default: ${DEFAULT_QUEST_RELAY_URL})`)
     .option("--agent <name>", "Agent identifier (default: naracli)")
     .option("--model <name>", "Model identifier")
+    .option("--referral <agent-id>", "Referral agent ID")
     .action(async (answer: string, opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
         const relayUrl = opts.relay === true ? DEFAULT_QUEST_RELAY_URL : opts.relay;
-        await handleQuestAnswer(answer, { ...globalOpts, relay: relayUrl, agent: opts.agent, model: opts.model });
+        await handleQuestAnswer(answer, { ...globalOpts, relay: relayUrl, agent: opts.agent, model: opts.model, referral: opts.referral });
       } catch (error: any) {
         printError(error.message);
         process.exit(1);

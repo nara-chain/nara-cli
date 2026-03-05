@@ -27,6 +27,7 @@ import {
   ZKID_DENOMINATIONS,
 } from "nara-sdk";
 import BN from "bn.js";
+import { addZkId, loadAgentConfig } from "../utils/agent-config";
 
 // ─── Denomination helpers ────────────────────────────────────────
 
@@ -72,6 +73,7 @@ async function handleZkIdCreate(name: string, options: GlobalOptions) {
   if (!options.json) printInfo(`Registering ZK ID "${name}"...`);
   const signature = await createZkId(connection, wallet, name, idSecret);
   if (!options.json) printSuccess(`ZK ID "${name}" registered!`);
+  await addZkId(name);
 
   if (options.json) {
     formatOutput({ name, signature }, true);
@@ -134,45 +136,82 @@ async function handleZkIdDeposit(
   }
 }
 
-async function handleZkIdScan(name: string, options: GlobalOptions) {
+async function handleZkIdScan(
+  name: string | undefined,
+  options: GlobalOptions & { withdraw?: boolean }
+) {
   const rpcUrl = getRpcUrl(options.rpcUrl);
   const connection = new Connection(rpcUrl, "confirmed");
   const wallet = await loadWallet(options.wallet);
 
-  if (!options.json) printInfo(`Scanning claimable deposits for "${name}"...`);
-  const idSecret = await deriveIdSecret(wallet, name);
-  const claimable = await scanClaimableDeposits(connection, name, idSecret);
+  // Determine which names to scan
+  let names: string[];
+  if (name) {
+    names = [name];
+  } else {
+    const config = await loadAgentConfig();
+    if (config.zk_ids.length === 0) {
+      printError("No ZK IDs in config. Provide a name or create a ZK ID first.");
+      process.exit(1);
+    }
+    names = config.zk_ids;
+  }
+
+  const allResults: Array<{ name: string; deposits: any[] }> = [];
+
+  for (const scanName of names) {
+    if (!options.json) printInfo(`Scanning claimable deposits for "${scanName}"...`);
+    const idSecret = await deriveIdSecret(wallet, scanName);
+    const claimable = await scanClaimableDeposits(connection, scanName, idSecret);
+
+    const deposits = claimable.map((d) => ({
+      leafIndex: d.leafIndex.toString(),
+      depositIndex: d.depositIndex,
+      denomination: d.denomination.toString(),
+      nara: Number(d.denomination) / 1e9,
+    }));
+    allResults.push({ name: scanName, deposits });
+
+    if (!options.json) {
+      if (claimable.length === 0) {
+        printInfo(`  "${scanName}": no claimable deposits`);
+      } else {
+        console.log(`\n  "${scanName}": ${claimable.length} claimable deposit(s):`);
+        claimable.forEach((d, i) => {
+          const nara = Number(d.denomination) / 1e9;
+          console.log(
+            `  [${i}] ${nara} NARA  leafIndex=${d.leafIndex}  depositIndex=${d.depositIndex}`
+          );
+        });
+      }
+    }
+
+    // Auto-withdraw if requested
+    if (options.withdraw && claimable.length > 0) {
+      const kp = generateValidRecipient();
+      const recipient = kp.publicKey;
+      if (!options.json) printInfo(`  Auto-withdrawing to ${recipient.toBase58()}...`);
+      for (const dep of claimable) {
+        const nara = Number(dep.denomination) / 1e9;
+        try {
+          const sig = await withdraw(connection, wallet, scanName, idSecret, dep, recipient);
+          if (!options.json) printSuccess(`  Withdrawn ${nara} NARA (tx: ${sig})`);
+        } catch (err: any) {
+          printError(`  Failed to withdraw ${nara} NARA: ${err.message}`);
+        }
+      }
+    }
+  }
 
   if (options.json) {
-    formatOutput(
-      {
-        name,
-        count: claimable.length,
-        deposits: claimable.map((d) => ({
-          leafIndex: d.leafIndex.toString(),
-          depositIndex: d.depositIndex,
-          denomination: d.denomination.toString(),
-          nara: Number(d.denomination) / 1e9,
-        })),
-      },
-      true
-    );
-    return;
+    if (names.length === 1) {
+      formatOutput({ name: names[0], count: allResults[0]!.deposits.length, deposits: allResults[0]!.deposits }, true);
+    } else {
+      formatOutput(allResults.map((r) => ({ name: r.name, count: r.deposits.length, deposits: r.deposits })), true);
+    }
+  } else {
+    console.log("");
   }
-
-  if (claimable.length === 0) {
-    printInfo("No claimable deposits found");
-    return;
-  }
-
-  console.log(`\n  Found ${claimable.length} claimable deposit(s):`);
-  claimable.forEach((d, i) => {
-    const nara = Number(d.denomination) / 1e9;
-    console.log(
-      `  [${i}] ${nara} NARA  leafIndex=${d.leafIndex}  depositIndex=${d.depositIndex}`
-    );
-  });
-  console.log("");
 }
 
 async function handleZkIdWithdraw(
@@ -353,12 +392,13 @@ export function registerZkIdCommands(program: Command): void {
 
   // zkid scan
   zkid
-    .command("scan <name>")
-    .description("Scan claimable deposits for a ZK ID (requires wallet)")
-    .action(async (name: string, _opts: any, cmd: Command) => {
+    .command("scan [name]")
+    .description("Scan claimable deposits (all from config if no name)")
+    .option("-w, --withdraw", "Auto-withdraw all claimable deposits found")
+    .action(async (name: string | undefined, opts: { withdraw?: boolean }, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
-        await handleZkIdScan(name, globalOpts);
+        await handleZkIdScan(name, { ...globalOpts, ...opts });
       } catch (error: any) {
         printError(error.message);
         process.exit(1);
@@ -394,9 +434,9 @@ export function registerZkIdCommands(program: Command): void {
       }
     });
 
-  // zkid transfer
+  // zkid transfer-owner
   zkid
-    .command("transfer <name> <new-id-commitment>")
+    .command("transfer-owner <name> <new-id-commitment>")
     .description("Transfer ZK ID ownership to the holder of a new idCommitment")
     .action(async (name: string, newIdCommitment: string, _opts: any, cmd: Command) => {
       try {

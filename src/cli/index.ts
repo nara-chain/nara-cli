@@ -11,6 +11,7 @@ import { registerWalletCommands } from "./commands/wallet";
 import { registerQuestCommands } from "./commands/quest";
 import { registerSkillsCommands } from "./commands/skills";
 import { registerZkIdCommands } from "./commands/zkid";
+import { registerAgentCommands } from "./commands/agent";
 import {
   handleWalletAddress,
   handleWalletBalance,
@@ -73,6 +74,9 @@ export function registerCommands(program: Command): void {
 
   // zkid
   registerZkIdCommands(program);
+
+  // agent
+  registerAgentCommands(program);
 
   // Top-level: address
   program
