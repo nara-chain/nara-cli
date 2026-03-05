@@ -1,12 +1,15 @@
 /**
  * Tests for `zkid` CLI commands
  *
+ * - Help / validation tests run without wallet or chain
+ * - On-chain tests (create, deposit, etc.) require PRIVATE_KEY in .env
+ *
  * Run: npm test
  */
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { runCli, hasWallet } from "./helpers.js";
+import { runCli, hasWallet, uniqueName } from "./helpers.js";
 
 // ─── Help output ──────────────────────────────────────────────────
 
@@ -40,7 +43,7 @@ describe("zkid --help", () => {
   });
 });
 
-// ─── deposit validation (no chain needed) ────────────────────────
+// ─── Deposit validation (no chain needed) ─────────────────────────
 
 describe("zkid deposit denomination validation", () => {
   for (const bad of ["0", "2", "5", "50", "500", "9999", "200000"]) {
@@ -60,7 +63,7 @@ describe("zkid deposit denomination validation", () => {
   });
 });
 
-// ─── transfer validation (no chain needed) ───────────────────────
+// ─── Transfer validation (no chain needed) ────────────────────────
 
 describe("zkid transfer commitment validation", () => {
   it("rejects commitment shorter than 64 chars", async () => {
@@ -85,7 +88,7 @@ describe("zkid transfer commitment validation", () => {
   });
 });
 
-// ─── withdraw validation (no chain needed) ───────────────────────
+// ─── Withdraw validation (no chain needed) ────────────────────────
 
 describe("zkid withdraw validation", () => {
   it("rejects --recipient that is not a valid public key", async () => {
@@ -113,7 +116,7 @@ describe("zkid info (read-only)", () => {
   });
 });
 
-// ─── id-commitment (requires wallet) ─────────────────────────────
+// ─── id-commitment (requires wallet, no chain) ───────────────────
 
 describe("zkid id-commitment", () => {
   it("outputs a 64-char hex commitment", async () => {
@@ -149,5 +152,114 @@ describe("zkid id-commitment", () => {
     assert.equal(r1.exitCode, 0);
     assert.equal(r2.exitCode, 0);
     assert.notEqual(JSON.parse(r1.stdout).idCommitment, JSON.parse(r2.stdout).idCommitment);
+  });
+});
+
+// ─── On-chain tests (requires wallet + NARA balance) ─────────────
+
+describe("zkid on-chain", () => {
+  const ZKID_NAME = uniqueName("test-zkid");
+
+  it("id-commitment is deterministic", async () => {
+    if (!hasWallet) return;
+    console.log(`\nUsing ZK ID name: ${ZKID_NAME}`);
+    const r1 = await runCli(["zkid", "id-commitment", "--json", ZKID_NAME]);
+    const r2 = await runCli(["zkid", "id-commitment", "--json", ZKID_NAME]);
+    assert.equal(r1.exitCode, 0, `stderr: ${r1.stderr}`);
+    assert.equal(r2.exitCode, 0);
+    const c1 = JSON.parse(r1.stdout);
+    const c2 = JSON.parse(r2.stdout);
+    assert.match(c1.idCommitment, /^[0-9a-f]{64}$/);
+    assert.equal(c1.idCommitment, c2.idCommitment, "commitment not deterministic");
+  });
+
+  it("create registers a new ZK ID on-chain", async () => {
+    if (!hasWallet) return;
+    const { stdout, stderr, exitCode } = await runCli([
+      "zkid", "create", ZKID_NAME,
+    ]);
+    assert.equal(exitCode, 0, `stderr: ${stderr}`);
+    assert.ok(stdout.includes("registered") || stdout.includes("Transaction"), `stdout: ${stdout}`);
+  });
+
+  it("create again exits 0 with warning (already exists)", async () => {
+    if (!hasWallet) return;
+    const { stdout, exitCode } = await runCli(["zkid", "create", ZKID_NAME]);
+    assert.equal(exitCode, 0);
+    assert.ok(stdout.includes("already exists"), `stdout: ${stdout}`);
+  });
+
+  it("info returns correct fields for existing ZK ID", async () => {
+    if (!hasWallet) return;
+    const { stdout, exitCode, stderr } = await runCli([
+      "zkid", "info", "--json", ZKID_NAME,
+    ]);
+    assert.equal(exitCode, 0, `stderr: ${stderr}`);
+    const json = JSON.parse(stdout);
+    assert.equal(json.name, ZKID_NAME);
+    assert.equal(json.depositCount, 0);
+    assert.equal(json.commitmentStartIndex, 0);
+    assert.match(json.idCommitment, /^[0-9a-f]{64}$/);
+  });
+
+  it("id-commitment matches the commitment stored on-chain", async () => {
+    if (!hasWallet) return;
+    const commitResult = await runCli(["zkid", "id-commitment", "--json", ZKID_NAME]);
+    const infoResult = await runCli(["zkid", "info", "--json", ZKID_NAME]);
+    assert.equal(commitResult.exitCode, 0);
+    assert.equal(infoResult.exitCode, 0);
+    const localCommitment = JSON.parse(commitResult.stdout).idCommitment;
+    const chainCommitment = JSON.parse(infoResult.stdout).idCommitment;
+    assert.equal(localCommitment, chainCommitment, "local commitment != on-chain commitment");
+  });
+
+  it("deposit 1 NARA into the ZK ID", async () => {
+    if (!hasWallet) return;
+    const { stdout, stderr, exitCode } = await runCli([
+      "zkid", "deposit", ZKID_NAME, "1",
+    ]);
+    assert.equal(exitCode, 0, `stderr: ${stderr}`);
+    assert.ok(stdout.includes("Transaction"), `stdout: ${stdout}`);
+  });
+
+  it("info shows depositCount=1 after deposit", async () => {
+    if (!hasWallet) return;
+    const { stdout, exitCode } = await runCli(["zkid", "info", "--json", ZKID_NAME]);
+    assert.equal(exitCode, 0);
+    const json = JSON.parse(stdout);
+    assert.equal(json.depositCount, 1);
+  });
+
+  it("scan finds 1 claimable deposit", async () => {
+    if (!hasWallet) return;
+    const { stdout, exitCode, stderr } = await runCli([
+      "zkid", "scan", "--json", ZKID_NAME,
+    ]);
+    assert.equal(exitCode, 0, `stderr: ${stderr}`);
+    const json = JSON.parse(stdout);
+    assert.equal(json.count, 1);
+    assert.equal(json.deposits[0].nara, 1);
+  });
+
+  it("withdraw sends funds to auto-generated recipient", async () => {
+    if (!hasWallet) return;
+    const { stdout, stderr, exitCode } = await runCli([
+      "zkid", "withdraw", "--json", ZKID_NAME,
+    ]);
+    assert.equal(exitCode, 0, `stderr: ${stderr}`);
+    const json = JSON.parse(stdout);
+    assert.ok(json.recipient, "no recipient in output");
+    assert.ok(json.signature, "no signature in output");
+    assert.equal(json.nara, 1);
+  });
+
+  it("scan shows 0 claimable deposits after withdrawal", async () => {
+    if (!hasWallet) return;
+    const { stdout, exitCode } = await runCli([
+      "zkid", "scan", "--json", ZKID_NAME,
+    ]);
+    assert.equal(exitCode, 0);
+    const json = JSON.parse(stdout);
+    assert.equal(json.count, 0, `expected 0, got ${json.count}`);
   });
 });

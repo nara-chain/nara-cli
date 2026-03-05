@@ -27,10 +27,11 @@ program
 // Register all command modules
 registerCommands(program);
 
-// Parse arguments and execute
-program.parse(process.argv);
-
-// Show help if no command provided
+// Show help if no command provided, then exit cleanly
 if (!process.argv.slice(2).length) {
   program.outputHelp();
+  process.exit(0);
 }
+
+// Parse arguments and execute
+program.parse(process.argv);

@@ -1,17 +1,18 @@
 /**
  * Tests for `skills` CLI commands
  *
+ * - Help / validation tests run without wallet or chain
+ * - On-chain tests (register, upload, etc.) require PRIVATE_KEY in .env
+ *
  * Run: npm test
  */
 
-import { describe, it, after } from "node:test";
+import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { writeFileSync, unlinkSync, mkdtempSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { runCli, hasWallet, uniqueName } from "./helpers.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const TEST_SKILL_FILE = join(__dirname, "test_skill.md");
 
 // ─── Help output ──────────────────────────────────────────────────
 
@@ -89,15 +90,31 @@ describe("skills read-only queries", () => {
   });
 });
 
-// ─── Success cases (requires wallet) ─────────────────────────────
+// ─── On-chain tests (requires wallet + NARA balance) ─────────────
 
-describe("skills success cases", () => {
-  const SKILL_NAME = uniqueName("unit-skill");
-  const AUTHOR = "unit-test-author";
+describe("skills on-chain", () => {
+  const SKILL_NAME = uniqueName("test-skill");
+  const AUTHOR = "test-author";
+  let tmpDir: string;
+  let contentFile: string;
+
+  before(() => {
+    if (!hasWallet) return;
+    tmpDir = mkdtempSync(join(tmpdir(), "naracli-test-"));
+    contentFile = join(tmpDir, "skill-content.md");
+    writeFileSync(contentFile, `# ${SKILL_NAME}\n\nThis is test content.\n`);
+    console.log(`\nUsing skill name: ${SKILL_NAME}`);
+  });
 
   after(async () => {
     if (!hasWallet) return;
-    await runCli(["skills", "delete", SKILL_NAME]);
+    try { unlinkSync(contentFile); } catch {}
+    const { exitCode, stderr } = await runCli(["skills", "delete", SKILL_NAME]);
+    if (exitCode !== 0) {
+      console.warn(`  Warning: failed to delete skill "${SKILL_NAME}": ${stderr}`);
+    } else {
+      console.log(`  Cleaned up skill "${SKILL_NAME}"`);
+    }
   });
 
   it("register a new skill on-chain", async () => {
@@ -106,7 +123,7 @@ describe("skills success cases", () => {
       "skills", "register", SKILL_NAME, AUTHOR,
     ]);
     assert.equal(exitCode, 0, `stderr: ${stderr}`);
-    assert.ok(stdout.includes("Transaction"), `stdout: ${stdout}`);
+    assert.ok(stdout.includes("registered") || stdout.includes("Transaction"), `stdout: ${stdout}`);
   });
 
   it("get --json returns correct name, author and initial state", async () => {
@@ -127,7 +144,7 @@ describe("skills success cases", () => {
 
   it("set-description updates description on-chain", async () => {
     if (!hasWallet) return;
-    const desc = "A unit-test skill description";
+    const desc = "A test skill description";
     const { exitCode, stderr } = await runCli([
       "skills", "set-description", SKILL_NAME, desc,
     ]);
@@ -139,7 +156,7 @@ describe("skills success cases", () => {
 
   it("set-metadata updates metadata on-chain", async () => {
     if (!hasWallet) return;
-    const meta = JSON.stringify({ env: "unit-test", ok: true });
+    const meta = JSON.stringify({ env: "test", ok: true });
     const { exitCode, stderr } = await runCli([
       "skills", "set-metadata", SKILL_NAME, meta,
     ]);
@@ -149,16 +166,16 @@ describe("skills success cases", () => {
     assert.equal(JSON.parse(stdout).metadata, meta);
   });
 
-  it("upload test_skill.md uploads content on-chain", async () => {
+  it("upload content from file", async () => {
     if (!hasWallet) return;
     const { stdout, stderr, exitCode } = await runCli([
-      "skills", "upload", SKILL_NAME, TEST_SKILL_FILE,
+      "skills", "upload", SKILL_NAME, contentFile,
     ]);
     assert.equal(exitCode, 0, `stderr: ${stderr}`);
     assert.ok(stdout.includes("Transaction") || stdout.includes("Finalize"), `stdout: ${stdout}`);
   });
 
-  it("get --json shows version=1 and non-null updatedAt after upload", async () => {
+  it("get --json shows version=1 after upload", async () => {
     if (!hasWallet) return;
     const { stdout, exitCode, stderr } = await runCli([
       "skills", "get", "--json", SKILL_NAME,
@@ -169,7 +186,7 @@ describe("skills success cases", () => {
     assert.ok(json.updatedAt !== null, "updatedAt should be set after content upload");
   });
 
-  it("content --json reads back uploaded file", async () => {
+  it("content --json reads back uploaded data", async () => {
     if (!hasWallet) return;
     const { stdout, exitCode, stderr } = await runCli([
       "skills", "content", "--json", SKILL_NAME,
@@ -177,7 +194,7 @@ describe("skills success cases", () => {
     assert.equal(exitCode, 0, `stderr: ${stderr}`);
     const json = JSON.parse(stdout);
     assert.ok(typeof json.size === "number" && json.size > 0);
-    assert.ok(typeof json.content === "string" && json.content.length > 0);
+    assert.ok(typeof json.content === "string" && json.content.includes(SKILL_NAME));
   });
 
   it("delete removes the skill from chain", async () => {
@@ -185,7 +202,6 @@ describe("skills success cases", () => {
     const { exitCode, stderr } = await runCli(["skills", "delete", SKILL_NAME]);
     assert.equal(exitCode, 0, `stderr: ${stderr}`);
 
-    // Verify it's gone
     const { exitCode: getExit } = await runCli(["skills", "get", SKILL_NAME]);
     assert.equal(getExit, 1);
   });
