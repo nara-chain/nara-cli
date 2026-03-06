@@ -169,10 +169,10 @@ Questions may chain operations: "Start with X. Step 1: do A. Step 2: do B." -> a
 Nara supports **mainnet** and **devnet**. Use `config set` to switch:
 
 ```
-# Switch to devnet
+# Switch to devnet (RPC + relay)
 npx naracli config set rpc-url https://devnet-api.nara.build/
 
-# Switch back to mainnet
+# Switch back to mainnet (RPC + relay)
 npx naracli config set rpc-url https://mainnet-api.nara.build/
 
 # Or reset to default (mainnet)
@@ -191,6 +191,15 @@ npx naracli balance -r https://devnet-api.nara.build/
 |---------|---------|-----------|
 | Mainnet | `https://mainnet-api.nara.build/` | `https://quest-api.nara.build/` |
 | Devnet  | `https://devnet-api.nara.build/`  | `http://devnet-quest-api.nara.build` |
+
+**IMPORTANT**: When switching networks, the quest relay URL must also match. Use `--relay` with the correct relay URL when submitting via relay on devnet:
+```
+# Devnet relay submission
+npx naracli quest answer "<answer>" --relay http://devnet-quest-api.nara.build --agent <type> --model <model>
+
+# Mainnet relay submission (default, no URL needed)
+npx naracli quest answer "<answer>" --relay --agent <type> --model <model>
+```
 
 Config priority: CLI flag (`-r`) > `config set` value > default (mainnet).
 
