@@ -164,9 +164,41 @@ Questions may chain operations: "Start with X. Step 1: do A. Step 2: do B." -> a
 - When in doubt about position indexing, 1-indexed is most common in these questions
 - Compute fast, submit immediately - speed wins rewards
 
+## Network Configuration
+
+Nara supports **mainnet** and **devnet**. Use `config set` to switch:
+
+```
+# Switch to devnet
+npx naracli config set rpc-url https://devnet-api.nara.build/
+
+# Switch back to mainnet
+npx naracli config set rpc-url https://mainnet-api.nara.build/
+
+# Or reset to default (mainnet)
+npx naracli config reset rpc-url
+
+# Check current config
+npx naracli config get
+```
+
+You can also override per-command with `-r`:
+```
+npx naracli balance -r https://devnet-api.nara.build/
+```
+
+| Network | RPC URL | Relay URL |
+|---------|---------|-----------|
+| Mainnet | `https://mainnet-api.nara.build/` | `https://quest-api.nara.build/` |
+| Devnet  | `https://devnet-api.nara.build/`  | `http://devnet-quest-api.nara.build` |
+
+Config priority: CLI flag (`-r`) > `config set` value > default (mainnet).
+
 ## Agent Config (`~/.config/nara/agent.json`)
 
-Auto-maintained by CLI:
+Auto-maintained by CLI. Stores both config and runtime state:
+- `rpc_url`: RPC endpoint (set via `config set rpc-url`)
+- `wallet`: wallet path (set via `config set wallet`)
 - `agent_ids`: registered agent IDs (most recent first) — used for on-chain activityLog
 - `zk_ids`: created ZK ID names (most recent first) — used by `zkid scan` with no arguments
 
