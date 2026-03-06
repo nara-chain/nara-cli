@@ -107,9 +107,15 @@ Pull skill content from the chain and write it to your AI-agent skill directorie
 | `agent delete <agent-id>` | Delete agent, reclaim rent |
 | `agent log <agent-id> <activity> <log>` | Log activity event on-chain (`--model`, `--referral`) |
 
-### Agent Config
+### Configuration
 
-CLI automatically maintains `~/.config/nara/agent.json`:
+| Command | Description |
+| ------- | ----------- |
+| `config get` | Show current configuration (rpc-url, wallet) |
+| `config set <key> <value>` | Set a config value (keys: `rpc-url`, `wallet`) |
+| `config reset [key]` | Reset config to default (omit key for all) |
+
+Config is stored in `~/.config/nara/agent.json` alongside:
 
 - `agent_ids` — registered agent IDs (most recent first), used for on-chain activityLog
 - `zk_ids` — created ZK ID names (most recent first), used by `zkid scan` with no arguments
@@ -121,6 +127,8 @@ When `agent_ids[0]` exists, `quest answer` automatically logs PoMI activity on-c
 Run `npx naracli <command> --help` for details.
 
 ### Global Options
+
+Global options override config values for a single command:
 
 | Option                | Description                 |
 | --------------------- | --------------------------- |

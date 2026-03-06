@@ -12,6 +12,7 @@ import { registerQuestCommands } from "./commands/quest";
 import { registerSkillsCommands } from "./commands/skills";
 import { registerZkIdCommands } from "./commands/zkid";
 import { registerAgentCommands } from "./commands/agent";
+import { registerConfigCommands } from "./commands/config";
 import {
   handleWalletAddress,
   handleWalletBalance,
@@ -77,6 +78,9 @@ export function registerCommands(program: Command): void {
 
   // agent
   registerAgentCommands(program);
+
+  // config
+  registerConfigCommands(program);
 
   // Top-level: address
   program

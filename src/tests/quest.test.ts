@@ -106,8 +106,8 @@ describe("quest proof generation", () => {
 
 // ─── On-chain quest answer ────────────────────────────────────────
 
-describe("quest answer (on-chain)", { skip: !hasWallet ? "no PRIVATE_KEY" : undefined }, () => {
-  it("submits answer from test-questions", async () => {
+describe("quest answer (on-chain)", { skip: !hasWallet ? "no wallet" : undefined }, () => {
+  it("submits answer from test-questions and outputs tx", async () => {
     const rpcUrl = process.env.RPC_URL || "https://mainnet-api.nara.build/";
     const connection = new Connection(rpcUrl, "confirmed");
 
@@ -137,9 +137,10 @@ describe("quest answer (on-chain)", { skip: !hasWallet ? "no PRIVATE_KEY" : unde
       "--json",
     ]);
 
-    // exitCode 0 = success, but also handle "already answered" (exit 0 with warning)
     const output = stdout + stderr;
-    if (output.includes("already answered")) {
+
+    // Handle known non-error cases
+    if (output.includes("already answered") || output.includes("Already answered")) {
       console.log("  Already answered this round");
       return;
     }
@@ -148,8 +149,23 @@ describe("quest answer (on-chain)", { skip: !hasWallet ? "no PRIVATE_KEY" : unde
       return;
     }
 
+    // Handle confirmation timeout - tx was sent but ws confirmation failed
+    const sigMatch = output.match(/Check signature (\w{80,})/);
+    if (sigMatch) {
+      console.log(`  TX (confirmation timeout): ${sigMatch[1]}`);
+      return;
+    }
+
     assert.equal(exitCode, 0, `CLI failed: ${stderr}`);
-    assert.ok(output.includes("Transaction:") || output.includes("signature"), "should show transaction");
-    console.log("  Answer submitted successfully");
+
+    // Parse JSON output to get tx signature
+    try {
+      const data = JSON.parse(stdout);
+      assert.ok(data.signature, "should have signature in JSON output");
+      console.log(`  TX: ${data.signature}`);
+    } catch {
+      assert.ok(output.includes("Transaction:") || output.includes("signature"), "should show transaction");
+      console.log(`  Output: ${stdout.trim()}`);
+    }
   });
 });

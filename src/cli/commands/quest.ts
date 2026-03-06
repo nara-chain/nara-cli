@@ -59,7 +59,7 @@ function formatTimeRemaining(seconds: number): string {
 
 // ─── Command: quest get ──────────────────────────────────────────
 async function handleQuestGet(options: GlobalOptions) {
-  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const rpcUrl = await getRpcUrl(options.rpcUrl);
   const connection = new Connection(rpcUrl, "confirmed");
 
   let wallet: Keypair;
@@ -126,10 +126,10 @@ async function handleQuestAnswer(
   answer: string,
   options: GlobalOptions & { relay?: string; agent?: string; model?: string; referral?: string }
 ) {
-  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const rpcUrl = await getRpcUrl(options.rpcUrl);
   const connection = new Connection(rpcUrl, "confirmed");
   const wallet = await loadWallet(options.wallet);
-  const agentConfig = await loadAgentConfig();
+  const agentConfig = loadAgentConfig();
   const configAgentId = agentConfig.agent_ids[0];
   const agent = options.agent ?? "naracli";
   const model = options.model ?? "";

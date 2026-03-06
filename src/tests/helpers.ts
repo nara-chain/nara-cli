@@ -5,6 +5,8 @@
 import { spawn } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLI = join(__dirname, "../../bin/nara-cli.ts");
@@ -49,7 +51,7 @@ export function runCli(args: string[], extraEnv: Record<string, string> = {}): P
 }
 
 /** Whether a wallet is configured (for write-command tests) */
-export const hasWallet = !!process.env.PRIVATE_KEY;
+export const hasWallet = existsSync(join(homedir(), ".config", "nara", "id.json"));
 
 /** Generate a unique test resource name using a timestamp */
 export function uniqueName(prefix: string): string {

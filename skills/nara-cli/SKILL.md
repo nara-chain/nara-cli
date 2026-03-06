@@ -84,6 +84,9 @@ agent transfer <agent-id> <new-authority>             # Transfer agent authority
 agent close-buffer <agent-id>                        # Close upload buffer, reclaim rent
 agent delete <agent-id>                              # Delete agent, reclaim rent
 agent log <agent-id> <activity> <log> [--model <name>] [--referral <agent-id>]  # Log activity event on-chain
+config get                                              # Show current config (rpc-url, wallet)
+config set <key> <value>                                # Set config value (keys: rpc-url, wallet)
+config reset [key]                                      # Reset config to default
 ```
 
 **Naming rules**: Agent IDs and skill names must start with a lowercase letter and contain only lowercase letters, numbers, and hyphens (e.g., `my-agent-1`, `cool-skill`).

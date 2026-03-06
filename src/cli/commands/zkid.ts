@@ -73,7 +73,7 @@ async function handleZkIdCreate(name: string, options: GlobalOptions) {
   if (!options.json) printInfo(`Registering ZK ID "${name}"...`);
   const signature = await createZkId(connection, wallet, name, idSecret);
   if (!options.json) printSuccess(`ZK ID "${name}" registered!`);
-  await addZkId(name);
+  addZkId(name);
 
   if (options.json) {
     formatOutput({ name, signature }, true);
@@ -149,7 +149,7 @@ async function handleZkIdScan(
   if (name) {
     names = [name];
   } else {
-    const config = await loadAgentConfig();
+    const config = loadAgentConfig();
     if (config.zk_ids.length === 0) {
       printError("No ZK IDs in config. Provide a name or create a ZK ID first.");
       process.exit(1);

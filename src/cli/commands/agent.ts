@@ -41,7 +41,7 @@ async function handleAgentRegister(agentId: string, options: GlobalOptions) {
   if (!options.json) printInfo(`Registering agent "${agentId}"...`);
   const result = await registerAgent(connection, wallet, agentId);
   if (!options.json) printSuccess(`Agent "${agentId}" registered!`);
-  await addAgentId(agentId);
+  addAgentId(agentId);
 
   if (options.json) {
     formatOutput({ agentId, signature: result.signature, agentPubkey: result.agentPubkey.toBase58() }, true);

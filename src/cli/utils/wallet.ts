@@ -6,38 +6,39 @@ import { Keypair } from "@solana/web3.js";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { DEFAULT_RPC_URL } from "nara-sdk";
+import { loadAgentConfig } from "./agent-config";
 
-const _DEFAULT_WALLET_PATH = process.env.WALLET_PATH || "~/.config/nara/id.json";
+const DEFAULT_WALLET_PATH = join(homedir(), ".config", "nara", "id.json");
 
 /**
  * Resolve wallet path (expand ~ to home directory)
  */
-const DEFAULT_WALLET_PATH = _DEFAULT_WALLET_PATH.startsWith("~")
-  ? join(homedir(), _DEFAULT_WALLET_PATH.slice(1))
-  : _DEFAULT_WALLET_PATH;
+function resolvePath(p: string): string {
+  return p.startsWith("~") ? join(homedir(), p.slice(1)) : p;
+}
 
 /**
  * Load wallet keypair from file
  *
  * Priority:
  * 1. CLI flag (walletPath parameter)
- * 2. Default path (~/.config/nara/id.json)
- * 3. Error if neither exists
- *
- * @param walletPath Optional path to wallet keypair JSON file
- * @returns Keypair
- * @throws Error if wallet cannot be loaded
+ * 2. Config file (~/.config/nara/agent.json wallet field)
+ * 3. Default path (~/.config/nara/id.json)
  */
 export async function loadWallet(walletPath?: string): Promise<Keypair> {
-  // Use provided path or default path
-  const path = walletPath || DEFAULT_WALLET_PATH;
+  let path = walletPath;
+  if (!path) {
+    const config = loadAgentConfig();
+    path = config.wallet ? resolvePath(config.wallet) : DEFAULT_WALLET_PATH;
+  } else {
+    path = resolvePath(path);
+  }
 
   try {
     const fs = await import("node:fs/promises");
     const file = await fs.readFile(path, "utf-8");
     const data = JSON.parse(file);
 
-    // Handle both array format [1,2,3,...] and object format
     if (Array.isArray(data)) {
       return Keypair.fromSecretKey(new Uint8Array(data));
     } else if (data.secretKey) {
@@ -59,15 +60,15 @@ export async function loadWallet(walletPath?: string): Promise<Keypair> {
 }
 
 /**
- * Get RPC URL from options
+ * Get RPC URL
  *
  * Priority:
  * 1. CLI flag (rpcUrl parameter)
- * 2. Default (from constants)
- *
- * @param rpcUrl Optional RPC URL from CLI flag
- * @returns RPC URL
+ * 2. Config file (~/.config/nara/agent.json rpc_url field)
+ * 3. Default (from SDK constants)
  */
 export function getRpcUrl(rpcUrl?: string): string {
-  return rpcUrl || DEFAULT_RPC_URL;
+  if (rpcUrl) return rpcUrl;
+  const config = loadAgentConfig();
+  return config.rpc_url || DEFAULT_RPC_URL;
 }
