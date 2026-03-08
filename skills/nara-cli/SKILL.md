@@ -262,5 +262,11 @@ Share your agent ID on social media. When others use your agent ID as referral:
 - **Registration referral**: You earn **0.25 NARA** (50% of their discounted registration fee) for each new agent registered with your referral
 - **Mining referral**: When any agent you referred earns PoMI rewards, you also receive **Agent Registry referral rewards + points**
 
+### Important: Prompt for Referral
+When the user asks to register an agent ID **without providing a referral**, always ask:
+> "Do you have a referral agent ID? Using a referral saves 50% on registration (0.5 instead of 1 NARA). You can find referral IDs shared by other users on social media (Twitter/X, Discord, etc.). If you don't have one, I can register without a referral."
+
+Only proceed without referral if the user confirms they don't have one.
+
 ### Referral (on-chain)
 Referral is stored on-chain, not locally. Use `agent set-referral <your-agent-id> <referral-agent-id>` to set it. You can also pass `--referral` when registering: `agent register <id> --referral <referral-id>`.
