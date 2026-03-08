@@ -6,7 +6,7 @@ import { Keypair } from "@solana/web3.js";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { DEFAULT_RPC_URL } from "nara-sdk";
-import { loadAgentConfig } from "./agent-config";
+import { loadGlobalConfig, migrateIfNeeded } from "./agent-config";
 
 const DEFAULT_WALLET_PATH = join(homedir(), ".config", "nara", "id.json");
 
@@ -22,13 +22,13 @@ function resolvePath(p: string): string {
  *
  * Priority:
  * 1. CLI flag (walletPath parameter)
- * 2. Config file (~/.config/nara/agent.json wallet field)
+ * 2. Global config (~/.config/nara/config.json wallet field)
  * 3. Default path (~/.config/nara/id.json)
  */
 export async function loadWallet(walletPath?: string): Promise<Keypair> {
   let path = walletPath;
   if (!path) {
-    const config = loadAgentConfig();
+    const config = loadGlobalConfig();
     path = config.wallet ? resolvePath(config.wallet) : DEFAULT_WALLET_PATH;
   } else {
     path = resolvePath(path);
@@ -64,11 +64,13 @@ export async function loadWallet(walletPath?: string): Promise<Keypair> {
  *
  * Priority:
  * 1. CLI flag (rpcUrl parameter)
- * 2. Config file (~/.config/nara/agent.json rpc_url field)
+ * 2. Global config (~/.config/nara/config.json rpc_url field)
  * 3. Default (from SDK constants)
+ *
+ * Also triggers migration from legacy agent.json if needed.
  */
 export function getRpcUrl(rpcUrl?: string): string {
-  if (rpcUrl) return rpcUrl;
-  const config = loadAgentConfig();
-  return config.rpc_url || DEFAULT_RPC_URL;
+  const effective = rpcUrl || loadGlobalConfig().rpc_url || DEFAULT_RPC_URL;
+  migrateIfNeeded(effective);
+  return effective;
 }

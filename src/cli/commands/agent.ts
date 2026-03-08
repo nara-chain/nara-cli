@@ -15,7 +15,6 @@ import {
 import type { GlobalOptions } from "../types";
 import {
   registerAgent,
-  getAgentRecord,
   getAgentInfo,
   getAgentMemory,
   setBio,
@@ -25,6 +24,7 @@ import {
   transferAgentAuthority,
   deleteAgent,
   logActivity,
+  setReferral as setReferralOnChain,
 } from "nara-sdk";
 import { readFileSync } from "node:fs";
 import { addAgentId } from "../utils/agent-config";
@@ -32,22 +32,23 @@ import { validateName } from "../utils/validation";
 
 // ─── Command handlers ────────────────────────────────────────────
 
-async function handleAgentRegister(agentId: string, options: GlobalOptions) {
+async function handleAgentRegister(agentId: string, options: GlobalOptions & { referral?: string }) {
   validateName(agentId, "Agent ID");
   const rpcUrl = getRpcUrl(options.rpcUrl);
   const connection = new Connection(rpcUrl, "confirmed");
   const wallet = await loadWallet(options.wallet);
 
   if (!options.json) printInfo(`Registering agent "${agentId}"...`);
-  const result = await registerAgent(connection, wallet, agentId);
+  const result = await registerAgent(connection, wallet, agentId, undefined, options.referral);
   if (!options.json) printSuccess(`Agent "${agentId}" registered!`);
-  addAgentId(agentId);
+  addAgentId(agentId, rpcUrl);
 
   if (options.json) {
-    formatOutput({ agentId, signature: result.signature, agentPubkey: result.agentPubkey.toBase58() }, true);
+    formatOutput({ agentId, referral: options.referral ?? null, signature: result.signature, agentPubkey: result.agentPubkey.toBase58() }, true);
   } else {
     console.log(`  Transaction: ${result.signature}`);
     console.log(`  Agent PDA: ${result.agentPubkey.toBase58()}`);
+    if (options.referral) console.log(`  Referral: ${options.referral}`);
   }
 }
 
@@ -225,6 +226,22 @@ async function handleAgentDelete(agentId: string, options: GlobalOptions) {
   }
 }
 
+async function handleAgentSetReferral(agentId: string, referralAgentId: string, options: GlobalOptions) {
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const connection = new Connection(rpcUrl, "confirmed");
+  const wallet = await loadWallet(options.wallet);
+
+  if (!options.json) printInfo(`Setting referral for "${agentId}" to "${referralAgentId}"...`);
+  const signature = await setReferralOnChain(connection, wallet, agentId, referralAgentId);
+  if (!options.json) printSuccess(`Referral set on-chain!`);
+
+  if (options.json) {
+    formatOutput({ agentId, referral: referralAgentId, signature }, true);
+  } else {
+    console.log(`  Transaction: ${signature}`);
+  }
+}
+
 async function handleAgentLog(
   agentId: string,
   activity: string,
@@ -259,10 +276,11 @@ export function registerAgentCommands(program: Command): void {
   agent
     .command("register <agent-id>")
     .description("Register a new agent on-chain")
-    .action(async (agentId: string, _opts: any, cmd: Command) => {
+    .option("--referral <agent-id>", "Referral agent ID")
+    .action(async (agentId: string, opts: { referral?: string }, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
-        await handleAgentRegister(agentId, globalOpts);
+        await handleAgentRegister(agentId, { ...globalOpts, ...opts });
       } catch (error: any) {
         printError(error.message);
         process.exit(1);
@@ -375,6 +393,20 @@ export function registerAgentCommands(program: Command): void {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
         await handleAgentDelete(agentId, globalOpts);
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // agent set-referral
+  agent
+    .command("set-referral <agent-id> <referral-agent-id>")
+    .description("Set referral agent on-chain")
+    .action(async (agentId: string, referralAgentId: string, _opts: any, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleAgentSetReferral(agentId, referralAgentId, globalOpts);
       } catch (error: any) {
         printError(error.message);
         process.exit(1);

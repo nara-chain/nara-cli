@@ -22,7 +22,7 @@ import {
   parseQuestReward,
   type ActivityLog,
 } from "nara-sdk";
-import { loadAgentConfig } from "../utils/agent-config";
+import { loadNetworkConfig } from "../utils/agent-config";
 
 const DEFAULT_QUEST_RELAY_URL = process.env.QUEST_RELAY_URL || "https://quest-api.nara.build/";
 
@@ -59,7 +59,7 @@ function formatTimeRemaining(seconds: number): string {
 
 // ─── Command: quest get ──────────────────────────────────────────
 async function handleQuestGet(options: GlobalOptions) {
-  const rpcUrl = await getRpcUrl(options.rpcUrl);
+  const rpcUrl = getRpcUrl(options.rpcUrl);
   const connection = new Connection(rpcUrl, "confirmed");
 
   let wallet: Keypair;
@@ -126,13 +126,14 @@ async function handleQuestAnswer(
   answer: string,
   options: GlobalOptions & { relay?: string; agent?: string; model?: string; referral?: string }
 ) {
-  const rpcUrl = await getRpcUrl(options.rpcUrl);
+  const rpcUrl = getRpcUrl(options.rpcUrl);
   const connection = new Connection(rpcUrl, "confirmed");
   const wallet = await loadWallet(options.wallet);
-  const agentConfig = loadAgentConfig();
-  const configAgentId = agentConfig.agent_ids[0];
+  const networkConfig = loadNetworkConfig(rpcUrl);
+  const configAgentId = networkConfig.agent_ids[0];
   const agent = options.agent ?? "naracli";
   const model = options.model ?? "";
+  const referral = options.referral;
 
   // 1. Fetch quest info
   let quest;
@@ -165,7 +166,7 @@ async function handleQuestAnswer(
 
   let proof;
   try {
-    proof = await generateProof(answer, quest.answerHash, wallet.publicKey);
+    proof = await generateProof(answer, quest.answerHash, wallet.publicKey, quest.round);
   } catch (err: any) {
     if (err.message?.includes("Assert Failed")) {
       printError("Wrong answer");
@@ -207,7 +208,7 @@ async function handleQuestAnswer(
     try {
       let activityLog: ActivityLog | undefined;
       if (configAgentId) {
-        activityLog = { agentId: configAgentId, activity: "PoMI", model, log: "", referralAgentId: options.referral };
+        activityLog = { agentId: configAgentId, activity: "PoMI", model, log: "", referralAgentId: referral };
       }
       const result = await submitAnswer(connection, wallet, proof.solana, agent, model, undefined, activityLog);
       printSuccess("Answer submitted!");

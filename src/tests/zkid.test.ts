@@ -17,7 +17,7 @@ describe("zkid --help", () => {
   it("shows all subcommands", async () => {
     const { stdout, exitCode } = await runCli(["zkid", "--help"]);
     assert.equal(exitCode, 0);
-    for (const cmd of ["create", "info", "deposit", "scan", "withdraw", "id-commitment", "transfer"]) {
+    for (const cmd of ["create", "info", "deposit", "scan", "withdraw", "id-commitment", "transfer-owner"]) {
       assert.ok(stdout.includes(cmd), `missing subcommand: ${cmd}`);
     }
   });
@@ -36,8 +36,8 @@ describe("zkid --help", () => {
     assert.ok(stdout.includes("--recipient"));
   });
 
-  it("zkid transfer --help shows <new-id-commitment>", async () => {
-    const { stdout, exitCode } = await runCli(["zkid", "transfer", "--help"]);
+  it("zkid transfer-owner --help shows <new-id-commitment>", async () => {
+    const { stdout, exitCode } = await runCli(["zkid", "transfer-owner", "--help"]);
     assert.equal(exitCode, 0);
     assert.ok(stdout.includes("<new-id-commitment>"));
   });
@@ -68,21 +68,21 @@ describe("zkid deposit denomination validation", () => {
 describe("zkid transfer commitment validation", () => {
   it("rejects commitment shorter than 64 chars", async () => {
     if (!hasWallet) return;
-    const { stderr, exitCode } = await runCli(["zkid", "transfer", "alice", "deadbeef"]);
+    const { stderr, exitCode } = await runCli(["zkid", "transfer-owner", "alice", "deadbeef"]);
     assert.equal(exitCode, 1);
     assert.ok(stderr.includes("Invalid id-commitment"), `stderr: ${stderr}`);
   });
 
   it("rejects commitment with non-hex characters", async () => {
     if (!hasWallet) return;
-    const { stderr, exitCode } = await runCli(["zkid", "transfer", "alice", "z".repeat(64)]);
+    const { stderr, exitCode } = await runCli(["zkid", "transfer-owner", "alice", "z".repeat(64)]);
     assert.equal(exitCode, 1);
     assert.ok(stderr.includes("Invalid id-commitment"), `stderr: ${stderr}`);
   });
 
   it("rejects commitment that is 63 chars (one short)", async () => {
     if (!hasWallet) return;
-    const { stderr, exitCode } = await runCli(["zkid", "transfer", "alice", "a".repeat(63)]);
+    const { stderr, exitCode } = await runCli(["zkid", "transfer-owner", "alice", "a".repeat(63)]);
     assert.equal(exitCode, 1);
     assert.ok(stderr.includes("Invalid id-commitment"), `stderr: ${stderr}`);
   });

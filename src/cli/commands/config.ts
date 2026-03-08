@@ -3,32 +3,50 @@
  */
 
 import { Command } from "commander";
-import { loadAgentConfig, saveAgentConfig } from "../utils/agent-config";
+import {
+  loadGlobalConfig,
+  saveGlobalConfig,
+  loadNetworkConfig,
+  rpcUrlToNetworkName,
+} from "../utils/agent-config";
+import { getRpcUrl } from "../utils/wallet";
 import { printError, printSuccess, formatOutput } from "../utils/output";
 import { DEFAULT_RPC_URL } from "nara-sdk";
 import type { GlobalOptions } from "../types";
 
 function handleConfigGet(options: GlobalOptions) {
-  const config = loadAgentConfig();
+  const globalConfig = loadGlobalConfig();
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const networkConfig = loadNetworkConfig(rpcUrl);
+  const networkName = rpcUrlToNetworkName(rpcUrl);
+
   const data = {
-    rpc_url: config.rpc_url ?? DEFAULT_RPC_URL,
-    wallet: config.wallet ?? "~/.config/nara/id.json",
-    rpc_url_custom: !!config.rpc_url,
-    wallet_custom: !!config.wallet,
+    rpc_url: globalConfig.rpc_url ?? DEFAULT_RPC_URL,
+    wallet: globalConfig.wallet ?? "~/.config/nara/id.json",
+    rpc_url_custom: !!globalConfig.rpc_url,
+    wallet_custom: !!globalConfig.wallet,
+    network: networkName,
+    agent_ids: networkConfig.agent_ids,
+    zk_ids: networkConfig.zk_ids,
   };
 
   if (options.json) {
     formatOutput(data, true);
   } else {
     console.log("");
-    console.log(`  RPC URL: ${data.rpc_url}${data.rpc_url_custom ? "" : " (default)"}`);
-    console.log(`  Wallet:  ${data.wallet}${data.wallet_custom ? "" : " (default)"}`);
+    console.log(`  RPC URL:  ${data.rpc_url}${data.rpc_url_custom ? "" : " (default)"}`);
+    console.log(`  Wallet:   ${data.wallet}${data.wallet_custom ? "" : " (default)"}`);
+    console.log(`  Network:  ${networkName}`);
+    if (networkConfig.agent_ids.length > 0)
+      console.log(`  Agents:   ${networkConfig.agent_ids.join(", ")}`);
+    if (networkConfig.zk_ids.length > 0)
+      console.log(`  ZK IDs:   ${networkConfig.zk_ids.join(", ")}`);
     console.log("");
   }
 }
 
 function handleConfigSet(key: string, value: string, options: GlobalOptions) {
-  const config = loadAgentConfig();
+  const config = loadGlobalConfig();
 
   switch (key) {
     case "rpc-url":
@@ -41,18 +59,18 @@ function handleConfigSet(key: string, value: string, options: GlobalOptions) {
       throw new Error(`Unknown config key: "${key}". Valid keys: rpc-url, wallet`);
   }
 
-  saveAgentConfig(config);
+  saveGlobalConfig(config);
   if (!options.json) printSuccess(`Config "${key}" set to "${value}"`);
   if (options.json) formatOutput({ key, value }, true);
 }
 
 function handleConfigReset(key: string | undefined, options: GlobalOptions) {
-  const config = loadAgentConfig();
+  const config = loadGlobalConfig();
 
   if (!key) {
     delete config.rpc_url;
     delete config.wallet;
-    saveAgentConfig(config);
+    saveGlobalConfig(config);
     if (!options.json) printSuccess("All config reset to defaults");
   } else {
     switch (key) {
@@ -65,7 +83,7 @@ function handleConfigReset(key: string | undefined, options: GlobalOptions) {
       default:
         throw new Error(`Unknown config key: "${key}". Valid keys: rpc-url, wallet`);
     }
-    saveAgentConfig(config);
+    saveGlobalConfig(config);
     if (!options.json) printSuccess(`Config "${key}" reset to default`);
   }
 

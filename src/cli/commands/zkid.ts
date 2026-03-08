@@ -27,7 +27,7 @@ import {
   ZKID_DENOMINATIONS,
 } from "nara-sdk";
 import BN from "bn.js";
-import { addZkId, loadAgentConfig } from "../utils/agent-config";
+import { addZkId, loadNetworkConfig } from "../utils/agent-config";
 
 // ─── Denomination helpers ────────────────────────────────────────
 
@@ -73,7 +73,7 @@ async function handleZkIdCreate(name: string, options: GlobalOptions) {
   if (!options.json) printInfo(`Registering ZK ID "${name}"...`);
   const signature = await createZkId(connection, wallet, name, idSecret);
   if (!options.json) printSuccess(`ZK ID "${name}" registered!`);
-  addZkId(name);
+  addZkId(name, rpcUrl);
 
   if (options.json) {
     formatOutput({ name, signature }, true);
@@ -149,12 +149,12 @@ async function handleZkIdScan(
   if (name) {
     names = [name];
   } else {
-    const config = loadAgentConfig();
-    if (config.zk_ids.length === 0) {
+    const networkConfig = loadNetworkConfig(rpcUrl);
+    if (networkConfig.zk_ids.length === 0) {
       printError("No ZK IDs in config. Provide a name or create a ZK ID first.");
       process.exit(1);
     }
-    names = config.zk_ids;
+    names = networkConfig.zk_ids;
   }
 
   const allResults: Array<{ name: string; deposits: any[] }> = [];

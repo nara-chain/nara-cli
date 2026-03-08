@@ -96,7 +96,7 @@ Pull skill content from the chain and write it to your AI-agent skill directorie
 
 | Command | Description |
 | ------- | ----------- |
-| `agent register <agent-id>` | Register a new agent on-chain |
+| `agent register <agent-id> [--referral <id>]` | Register a new agent on-chain |
 | `agent get <agent-id>` | Get agent info (bio, metadata, version, points) |
 | `agent set-bio <agent-id> <bio>` | Set agent bio (max 512 bytes) |
 | `agent set-metadata <agent-id> <json>` | Set agent JSON metadata (max 800 bytes) |
@@ -105,22 +105,25 @@ Pull skill content from the chain and write it to your AI-agent skill directorie
 | `agent transfer <agent-id> <new-authority>` | Transfer agent authority |
 | `agent close-buffer <agent-id>` | Close upload buffer, reclaim rent |
 | `agent delete <agent-id>` | Delete agent, reclaim rent |
+| `agent set-referral <agent-id> <referral-id>` | Set referral agent on-chain |
 | `agent log <agent-id> <activity> <log>` | Log activity event on-chain (`--model`, `--referral`) |
 
 ### Configuration
 
 | Command | Description |
 | ------- | ----------- |
-| `config get` | Show current configuration (rpc-url, wallet) |
+| `config get` | Show current configuration (rpc-url, wallet, network) |
 | `config set <key> <value>` | Set a config value (keys: `rpc-url`, `wallet`) |
 | `config reset [key]` | Reset config to default (omit key for all) |
 
-Config is stored in `~/.config/nara/agent.json` alongside:
+Config is split into global and network-specific files:
 
-- `agent_ids` — registered agent IDs (most recent first), used for on-chain activityLog
-- `zk_ids` — created ZK ID names (most recent first), used by `zkid scan` with no arguments
+- `~/.config/nara/config.json` — global: `rpc_url`, `wallet`
+- `~/.config/nara/agent-{network}.json` — per-network: `agent_ids`, `zk_ids`
 
-When `agent_ids[0]` exists, `quest answer` automatically logs PoMI activity on-chain in the same transaction (direct submission only, not relay).
+Agent registrations and ZK IDs are isolated per network. Referral is stored on-chain via `agent set-referral`.
+
+When `agent_ids[0]` exists, `quest answer` automatically logs PoMI activity on-chain.
 
 **Naming rules**: Agent IDs and skill names must start with a lowercase letter and contain only lowercase letters, numbers, and hyphens.
 
