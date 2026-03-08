@@ -15,6 +15,7 @@ import {
 import type { GlobalOptions } from "../types";
 import {
   registerAgent,
+  registerAgentWithReferral,
   getAgentInfo,
   getAgentMemory,
   setBio,
@@ -24,6 +25,7 @@ import {
   transferAgentAuthority,
   deleteAgent,
   logActivity,
+  logActivityWithReferral,
   setReferral as setReferralOnChain,
 } from "nara-sdk";
 import { readFileSync } from "node:fs";
@@ -39,7 +41,9 @@ async function handleAgentRegister(agentId: string, options: GlobalOptions & { r
   const wallet = await loadWallet(options.wallet);
 
   if (!options.json) printInfo(`Registering agent "${agentId}"...`);
-  const result = await registerAgent(connection, wallet, agentId, undefined, options.referral);
+  const result = options.referral
+    ? await registerAgentWithReferral(connection, wallet, agentId, options.referral)
+    : await registerAgent(connection, wallet, agentId);
   if (!options.json) printSuccess(`Agent "${agentId}" registered!`);
   addAgentId(agentId, rpcUrl);
 
@@ -255,7 +259,9 @@ async function handleAgentLog(
   const referral = options.referral;
 
   if (!options.json) printInfo(`Logging activity for "${agentId}"...`);
-  const signature = await logActivity(connection, wallet, agentId, model, activity, log, undefined, referral);
+  const signature = referral
+    ? await logActivityWithReferral(connection, wallet, agentId, model, activity, log, referral)
+    : await logActivity(connection, wallet, agentId, model, activity, log);
   if (!options.json) printSuccess("Activity logged!");
 
   if (options.json) {
