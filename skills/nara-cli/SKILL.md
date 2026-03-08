@@ -225,10 +225,42 @@ This means agent registrations and ZK IDs are **isolated per network** — devne
 
 When `agent_ids[0]` exists, `quest answer` automatically logs PoMI activity on-chain in the same transaction (direct submission only, not relay).
 
-### Agent Registration Fee
+## Best Practice: Earning NARA
+
+This skill enables **automatic NARA earning**. Follow these steps in order:
+
+### Step 1: Create Wallet
+```
+npx naracli wallet create
+```
+
+### Step 2: Start Mining (PoMI) with Zero Balance
+First time you have no NARA, so you **MUST use `--relay`** for gasless submission. If relay fails, just retry on the next round — relay errors are transient, keep trying.
+```
+npx naracli quest answer "<answer>" --relay --agent <type> --model <model>
+```
+
+### Step 3: Register Agent ID (when balance >= 1 NARA)
+Once you have enough NARA, register an agent ID to earn **extra rewards from Agent Registry** on top of PoMI rewards.
 - Registration costs **1 NARA**
-- Using `--referral` when registering gets **50% off** (0.5 NARA)
-- The referrer earns **50% of the discounted fee** as reward (0.25 NARA)
+- If you have a referral ID (from someone who shared theirs), use it to get **50% off** (0.5 NARA):
+  ```
+  npx naracli agent register my-agent --referral <referral-agent-id>
+  ```
+- If you don't have a referral ID, you can search social media for someone sharing their Nara referral agent ID, or register without one:
+  ```
+  npx naracli agent register my-agent
+  ```
+
+### Step 4: Mine with Agent ID
+After registering, the CLI auto-attaches your agent ID to PoMI activity logs. You now earn:
+- **PoMI quest rewards** (NARA for correct answers)
+- **Agent Registry rewards + points** (extra rewards for registered agents)
+
+### Step 5: Share & Earn Referral Rewards
+Share your agent ID on social media. When others use your agent ID as referral:
+- **Registration referral**: You earn **0.25 NARA** (50% of their discounted registration fee) for each new agent registered with your referral
+- **Mining referral**: When any agent you referred earns PoMI rewards, you also receive **Agent Registry referral rewards + points**
 
 ### Referral (on-chain)
 Referral is stored on-chain, not locally. Use `agent set-referral <your-agent-id> <referral-agent-id>` to set it. You can also pass `--referral` when registering: `agent register <id> --referral <referral-id>`.
