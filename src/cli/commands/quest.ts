@@ -4,6 +4,7 @@
 
 import { Command } from "commander";
 import { Connection, Keypair } from "@solana/web3.js";
+import { join } from "node:path";
 import { loadWallet, getRpcUrl } from "../utils/wallet";
 import {
   formatOutput,
@@ -25,8 +26,21 @@ import {
   getStakeInfo,
   type ActivityLog,
   type StakeInfo,
+  type QuestOptions,
 } from "nara-sdk";
 import { loadNetworkConfig } from "../utils/agent-config";
+
+// In CJS bundle (dist/naracli.cjs), import.meta.url is undefined and SDK
+// cannot auto-resolve ZK circuit paths. Provide them explicitly via __dirname.
+// Use indirect access to avoid esbuild empty-import-meta warning.
+const _getMetaUrl = () => { try { return import.meta.url; } catch { return undefined; } };
+function getZkOptions(): QuestOptions | undefined {
+  if (_getMetaUrl()) return undefined; // dev mode: SDK resolves paths itself
+  return {
+    circuitWasmPath: join(__dirname, "zk", "answer_proof.wasm"),
+    zkeyPath: join(__dirname, "zk", "answer_proof_final.zkey"),
+  };
+}
 
 const DEFAULT_QUEST_RELAY_URL = process.env.QUEST_RELAY_URL || "https://quest-api.nara.build/";
 
@@ -178,7 +192,7 @@ async function handleQuestAnswer(
 
   let proof;
   try {
-    proof = await generateProof(answer, quest.answerHash, wallet.publicKey, quest.round);
+    proof = await generateProof(answer, quest.answerHash, wallet.publicKey, quest.round, getZkOptions());
   } catch (err: any) {
     if (err.message?.includes("Assert Failed")) {
       printError("Wrong answer");
