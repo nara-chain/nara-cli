@@ -20,7 +20,11 @@ import {
   submitAnswer,
   submitAnswerViaRelay,
   parseQuestReward,
+  stake as questStake,
+  unstake as questUnstake,
+  getStakeInfo,
   type ActivityLog,
+  type StakeInfo,
 } from "nara-sdk";
 import { loadNetworkConfig } from "../utils/agent-config";
 
@@ -34,9 +38,12 @@ const QUEST_ERRORS: Record<number, string> = {
   6003: "invalidProof",
   6004: "invalidDeadline",
   6005: "insufficientReward",
-  6006: "insufficientPoolBalance",
-  6007: "questionTooLong",
-  6008: "alreadyAnswered",
+  6006: "questionTooLong",
+  6007: "alreadyAnswered",
+  6008: "invalidMinRewardCount",
+  6009: "invalidMaxRewardCount",
+  6010: "unstakeNotReady",
+  6011: "insufficientStakeBalance",
 };
 
 function anchorErrorCode(err: any): string {
@@ -85,9 +92,8 @@ async function handleQuestGet(options: GlobalOptions) {
     return;
   }
 
-  const data = {
+  const data: Record<string, any> = {
     round: quest.round,
-    questionId: quest.questionId,
     question: quest.question,
     difficulty: quest.difficulty,
     rewardPerWinner: `${quest.rewardPerWinner} NARA`,
@@ -97,6 +103,8 @@ async function handleQuestGet(options: GlobalOptions) {
     deadline: new Date(quest.deadline * 1000).toLocaleString(),
     timeRemaining: formatTimeRemaining(quest.timeRemaining),
     expired: quest.expired,
+    stakeRequirement: `${quest.stakeRequirement} NARA`,
+    minWinnerStake: `${quest.minWinnerStake} NARA`,
   };
 
   if (options.json) {
@@ -111,6 +119,10 @@ async function handleQuestGet(options: GlobalOptions) {
     console.log(
       `  Reward slots: ${quest.winnerCount}/${quest.rewardCount} (${quest.remainingSlots} remaining)`
     );
+    if (quest.stakeRequirement > 0) {
+      console.log(`  Stake requirement: ${quest.stakeRequirement} NARA`);
+      console.log(`  Min winner stake: ${quest.minWinnerStake} NARA`);
+    }
     console.log(`  Deadline: ${new Date(quest.deadline * 1000).toLocaleString()}`);
     if (quest.timeRemaining > 0) {
       console.log(`  Time remaining: ${formatTimeRemaining(quest.timeRemaining)}`);
@@ -124,7 +136,7 @@ async function handleQuestGet(options: GlobalOptions) {
 // ─── Command: quest answer ───────────────────────────────────────
 async function handleQuestAnswer(
   answer: string,
-  options: GlobalOptions & { relay?: string; agent?: string; model?: string; referral?: string }
+  options: GlobalOptions & { relay?: string; agent?: string; model?: string; referral?: string; stake?: string }
 ) {
   const rpcUrl = getRpcUrl(options.rpcUrl);
   const connection = new Connection(rpcUrl, "confirmed");
@@ -210,13 +222,86 @@ async function handleQuestAnswer(
       if (configAgentId) {
         activityLog = { agentId: configAgentId, activity: "PoMI", model, log: "", referralAgentId: referral };
       }
-      const result = await submitAnswer(connection, wallet, proof.solana, agent, model, undefined, activityLog);
+      const stakeOpt = options.stake === "auto" ? "auto" : options.stake ? parseFloat(options.stake) : undefined;
+      const result = await submitAnswer(connection, wallet, proof.solana, agent, model, stakeOpt !== undefined ? { stake: stakeOpt } : undefined, activityLog);
       printSuccess("Answer submitted!");
       console.log(`  Transaction: ${result.signature}`);
       await handleReward(connection, result.signature, options);
     } catch (err: any) {
       handleSubmitError(err);
     }
+  }
+}
+
+// ─── Command: quest stake ────────────────────────────────────────
+async function handleQuestStake(amount: string, options: GlobalOptions) {
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const connection = new Connection(rpcUrl, "confirmed");
+  const wallet = await loadWallet(options.wallet);
+
+  const n = parseFloat(amount);
+  if (isNaN(n) || n <= 0) {
+    printError("Amount must be a positive number");
+    process.exit(1);
+  }
+
+  if (!options.json) printInfo(`Staking ${n} NARA...`);
+  const signature = await questStake(connection, wallet, n);
+  if (!options.json) printSuccess(`Staked ${n} NARA!`);
+
+  if (options.json) {
+    formatOutput({ amount: n, signature }, true);
+  } else {
+    console.log(`  Transaction: ${signature}`);
+  }
+}
+
+// ─── Command: quest unstake ─────────────────────────────────────
+async function handleQuestUnstake(amount: string, options: GlobalOptions) {
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const connection = new Connection(rpcUrl, "confirmed");
+  const wallet = await loadWallet(options.wallet);
+
+  const n = parseFloat(amount);
+  if (isNaN(n) || n <= 0) {
+    printError("Amount must be a positive number");
+    process.exit(1);
+  }
+
+  if (!options.json) printInfo(`Unstaking ${n} NARA...`);
+  const signature = await questUnstake(connection, wallet, n);
+  if (!options.json) printSuccess(`Unstaked ${n} NARA!`);
+
+  if (options.json) {
+    formatOutput({ amount: n, signature }, true);
+  } else {
+    console.log(`  Transaction: ${signature}`);
+  }
+}
+
+// ─── Command: quest stake-info ──────────────────────────────────
+async function handleQuestStakeInfo(options: GlobalOptions) {
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const connection = new Connection(rpcUrl, "confirmed");
+  const wallet = await loadWallet(options.wallet);
+
+  const stakeInfo = await getStakeInfo(connection, wallet.publicKey);
+  if (!stakeInfo) {
+    if (options.json) {
+      formatOutput({ staked: false, amount: 0 }, true);
+    } else {
+      printInfo("No stake record found");
+    }
+    return;
+  }
+
+  if (options.json) {
+    formatOutput({ staked: true, amount: stakeInfo.amount, stakeRound: stakeInfo.stakeRound }, true);
+  } else {
+    console.log("");
+    console.log(`  Staked: ${stakeInfo.amount} NARA`);
+    console.log(`  Stake round: ${stakeInfo.stakeRound}`);
+    console.log("");
   }
 }
 
@@ -280,6 +365,12 @@ function handleSubmitError(err: any) {
     case "poolNotActive":
       printError("No active quest at the moment");
       break;
+    case "unstakeNotReady":
+      printError("Cannot unstake until round advances or deadline passes");
+      break;
+    case "insufficientStakeBalance":
+      printError("Unstake amount exceeds staked balance");
+      break;
     default:
       printError(`Failed to submit answer: ${err.message ?? String(err)}`);
       if (err.logs) {
@@ -318,11 +409,55 @@ export function registerQuestCommands(program: Command): void {
     .option("--agent <name>", "Agent identifier (default: naracli)")
     .option("--model <name>", "Model identifier")
     .option("--referral <agent-id>", "Referral agent ID")
+    .option("--stake [amount]", 'Stake NARA before answering ("auto" to top-up to requirement, or a number)')
     .action(async (answer: string, opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
         const relayUrl = opts.relay === true ? DEFAULT_QUEST_RELAY_URL : opts.relay;
-        await handleQuestAnswer(answer, { ...globalOpts, relay: relayUrl, agent: opts.agent, model: opts.model, referral: opts.referral });
+        const stakeVal = opts.stake === true ? "auto" : opts.stake;
+        await handleQuestAnswer(answer, { ...globalOpts, relay: relayUrl, agent: opts.agent, model: opts.model, referral: opts.referral, stake: stakeVal });
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // quest stake
+  quest
+    .command("stake <amount>")
+    .description("Stake NARA to participate in quests")
+    .action(async (amount: string, _opts: any, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleQuestStake(amount, globalOpts);
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // quest unstake
+  quest
+    .command("unstake <amount>")
+    .description("Unstake NARA (available after round advances or deadline passes)")
+    .action(async (amount: string, _opts: any, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleQuestUnstake(amount, globalOpts);
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // quest stake-info
+  quest
+    .command("stake-info")
+    .description("Get your current quest stake info")
+    .action(async (_opts: any, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleQuestStakeInfo(globalOpts);
       } catch (error: any) {
         printError(error.message);
         process.exit(1);

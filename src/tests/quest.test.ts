@@ -94,7 +94,7 @@ describe("quest proof generation", () => {
 
     // Generate proof with a random pubkey (we're just testing proof generation)
     const testKeypair = Keypair.generate();
-    const proof = await generateProof(match.answer, quest.answerHash, testKeypair.publicKey);
+    const proof = await generateProof(match.answer, quest.answerHash, testKeypair.publicKey, quest.round);
 
     assert.ok(proof.solana.proofA.length > 0, "proofA should not be empty");
     assert.ok(proof.solana.proofB.length > 0, "proofB should not be empty");

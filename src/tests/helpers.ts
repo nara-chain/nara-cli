@@ -7,6 +7,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
+import type { Connection } from "@solana/web3.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLI = join(__dirname, "../../bin/nara-cli.ts");
@@ -56,4 +57,23 @@ export const hasWallet = existsSync(join(homedir(), ".config", "nara", "id.json"
 /** Generate a unique test resource name using a timestamp */
 export function uniqueName(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}`;
+}
+
+/**
+ * Poll for transaction confirmation (avoids WebSocket-based confirmTransaction
+ * which fails with TLS errors on some networks).
+ */
+export async function pollConfirmation(
+  connection: Connection,
+  signature: string,
+  maxRetries = 30,
+  intervalMs = 1000
+): Promise<void> {
+  for (let i = 0; i < maxRetries; i++) {
+    const { value } = await connection.getSignatureStatuses([signature]);
+    const status = value[0]?.confirmationStatus;
+    if (status === "confirmed" || status === "finalized") return;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  throw new Error(`Transaction ${signature} not confirmed after ${maxRetries}s`);
 }

@@ -22,7 +22,7 @@ import { fileURLToPath } from "node:url";
 import { Connection, Keypair, LAMPORTS_PER_SOL, SystemProgram, Transaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import { DEFAULT_AGENT_REGISTRY_PROGRAM_ID, getQuestInfo, getAgentRecord } from "nara-sdk";
-import { runCli, hasWallet } from "./helpers.js";
+import { runCli, hasWallet, pollConfirmation } from "./helpers.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -80,7 +80,7 @@ describe("quest referral (on-chain)", { skip: !hasWallet ? "no PRIVATE_KEY" : un
     transferTx.recentBlockhash = (await connection.getLatestBlockhash("confirmed")).blockhash;
     transferTx.sign(mainWallet);
     const sig = await connection.sendRawTransaction(transferTx.serialize());
-    await connection.confirmTransaction(sig, "confirmed");
+    await pollConfirmation(connection, sig);
     console.log(`  Transfer tx: ${sig}`);
   });
 
@@ -106,9 +106,11 @@ describe("quest referral (on-chain)", { skip: !hasWallet ? "no PRIVATE_KEY" : un
     console.log("  Referral agent registered");
   });
 
-  it("registers main agent", async () => {
-    console.log(`  Registering main agent "${mainAgentId}"...`);
-    const { stdout, stderr, exitCode } = await runCli(["agent", "register", mainAgentId]);
+  it("registers main agent with referral", async () => {
+    console.log(`  Registering main agent "${mainAgentId}" with referral "${referralAgentId}"...`);
+    const { stdout, stderr, exitCode } = await runCli([
+      "agent", "register", mainAgentId, "--referral", referralAgentId,
+    ]);
     const output = stdout + stderr;
     if (output.includes("already") || output.includes("in use")) {
       console.log("  Agent already exists, continuing");
@@ -116,7 +118,7 @@ describe("quest referral (on-chain)", { skip: !hasWallet ? "no PRIVATE_KEY" : un
     }
     assert.equal(exitCode, 0, `Failed: ${stderr}`);
     assert.ok(output.includes("registered") || output.includes("Transaction"), "should confirm registration");
-    console.log("  Main agent registered");
+    console.log("  Main agent registered with referral");
   });
 
   it("answers quest with --referral", async () => {
@@ -162,7 +164,7 @@ describe("quest referral (on-chain)", { skip: !hasWallet ? "no PRIVATE_KEY" : un
     // Extract transaction signature
     const txMatch = output.match(/Transaction:\s+(\S+)/);
     assert.ok(txMatch, "should show transaction signature");
-    const txSig = txMatch![1];
+    const txSig = txMatch![1]!;
     console.log(`  Transaction: ${txSig}`);
 
     // Verify transaction succeeded on-chain
@@ -204,25 +206,16 @@ describe("quest referral (on-chain)", { skip: !hasWallet ? "no PRIVATE_KEY" : un
     console.log("  Answer submitted with referral successfully");
   });
 
-  it("verifies on-chain agent points", async () => {
+  it("verifies on-chain agent records", async () => {
     try {
       const mainRecord = await getAgentRecord(connection, mainAgentId);
-      console.log(`  Main agent points: ${mainRecord.points}`);
+      console.log(`  Main agent: ${mainRecord.agentId}, referral: ${mainRecord.referralId ?? "(none)"}`);
 
       const referralRecord = await getAgentRecord(connection, referralAgentId);
-      console.log(`  Referral agent points: ${referralRecord.points}`);
+      console.log(`  Referral agent: ${referralRecord.agentId}`);
 
-      if (mainRecord.points > 0) {
-        console.log("  OK: Main agent earned points");
-      } else {
-        console.log("  WARN: Main agent has 0 points (quest may not have been answered in this run)");
-      }
-
-      if (referralRecord.points > 0) {
-        console.log("  OK: Referral agent earned referral points");
-      } else {
-        console.log("  WARN: Referral agent has 0 points");
-      }
+      // Points are now minted as SPL tokens (Token-2022), not stored on AgentRecord
+      console.log("  OK: Both agent records exist on-chain");
     } catch (err: any) {
       console.log(`  (skipped: ${err.message})`);
     }
