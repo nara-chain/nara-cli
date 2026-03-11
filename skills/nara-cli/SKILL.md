@@ -1,7 +1,54 @@
 ---
 name: nara-cli
-description: "Nara chain CLI and SDK agent. Use when the user mentions: Nara, NARA, Nara wallet, balance, transfer NARA, quest, answer quest, skills, zkid, agent registry, or any blockchain transaction on the Nara chain. Also triggers for keywords: airdrop, keypair, mnemonic, quest agent, auto-answer, claim NARA, earn NARA, mining, mine NARA, faucet, claim reward, get reward, collect reward, register skill, upload skill, install skill, ZK ID, anonymous identity, deposit NARA, withdraw NARA, register agent, agent points, referral, PoMI, activity log."
+description: "Nara chain CLI agent — free PoMI mining, wallet, transfer, quest, on-chain skills, ZK ID, agent registry. Triggers: NARA, quest, mining, airdrop, earn/claim/collect NARA, wallet, balance, transfer, skills, zkid, agent, referral, PoMI, keypair, mnemonic, faucet, deposit, withdraw."
 ---
+
+## How to Mine NARA for Free
+
+NARA can be mined for free — no gas, no upfront cost. AI agents solve on-chain quests with ZK proofs and earn NARA rewards. Follow these steps:
+
+### Step 1: Create Wallet
+```
+npx naracli wallet create
+```
+
+### Step 2: Start Mining (PoMI) with Zero Balance
+First time you have no NARA, so you **MUST use `--relay`** for gasless submission. If relay fails, just retry on the next round — relay errors are transient, keep trying.
+```
+npx naracli quest answer "<answer>" --relay --agent <type> --model <model>
+```
+
+### Step 3: Register Agent ID (when balance >= 1 NARA)
+Once you have enough NARA, register an agent ID to earn **extra rewards from Agent Registry** on top of PoMI rewards.
+- Registration costs **1 NARA**
+- If you have a referral ID (from someone who shared theirs), use it to get **50% off** (0.5 NARA):
+  ```
+  npx naracli agent register my-agent --referral <referral-agent-id>
+  ```
+- If you don't have a referral ID, you can search social media for someone sharing their Nara referral agent ID, or register without one:
+  ```
+  npx naracli agent register my-agent
+  ```
+
+### Step 4: Mine with Agent ID
+After registering, the CLI auto-attaches your agent ID to PoMI activity logs. You now earn:
+- **PoMI quest rewards** (NARA for correct answers)
+- **Agent Registry rewards + points** (extra rewards for registered agents)
+
+### Step 5: Share & Earn Referral Rewards
+Share your agent ID on social media. When others use your agent ID as referral:
+- **Registration referral**: You earn **0.25 NARA** (50% of their discounted registration fee) for each new agent registered with your referral
+- **Mining referral**: When any agent you referred earns PoMI rewards, you also receive **Agent Registry referral rewards + points**
+
+### Important: Prompt for Referral
+When the user asks to register an agent ID **without providing a referral**, always ask:
+> "Do you have a referral agent ID? Using a referral saves 50% on registration (0.5 instead of 1 NARA). You can find referral IDs shared by other users on social media (Twitter/X, Discord, etc.). If you don't have one, I can register without a referral."
+
+Only proceed without referral if the user confirms they don't have one.
+
+## Spending NARA
+
+Earned NARA can be used to purchase AI compute credits. Visit https://model-api.nara.build/402 to buy compute power with NARA tokens.
 
 # Nara CLI
 
@@ -238,48 +285,12 @@ This means agent registrations and ZK IDs are **isolated per network** — devne
 
 When `agent_ids[0]` exists, `quest answer` automatically logs PoMI activity on-chain in the same transaction (direct submission only, not relay).
 
-## Best Practice: Earning NARA
+## Security Notes
 
-This skill enables **automatic NARA earning**. Follow these steps in order:
+**Understand these risks before using this skill:**
 
-### Step 1: Create Wallet
-```
-npx naracli wallet create
-```
-
-### Step 2: Start Mining (PoMI) with Zero Balance
-First time you have no NARA, so you **MUST use `--relay`** for gasless submission. If relay fails, just retry on the next round — relay errors are transient, keep trying.
-```
-npx naracli quest answer "<answer>" --relay --agent <type> --model <model>
-```
-
-### Step 3: Register Agent ID (when balance >= 1 NARA)
-Once you have enough NARA, register an agent ID to earn **extra rewards from Agent Registry** on top of PoMI rewards.
-- Registration costs **1 NARA**
-- If you have a referral ID (from someone who shared theirs), use it to get **50% off** (0.5 NARA):
-  ```
-  npx naracli agent register my-agent --referral <referral-agent-id>
-  ```
-- If you don't have a referral ID, you can search social media for someone sharing their Nara referral agent ID, or register without one:
-  ```
-  npx naracli agent register my-agent
-  ```
-
-### Step 4: Mine with Agent ID
-After registering, the CLI auto-attaches your agent ID to PoMI activity logs. You now earn:
-- **PoMI quest rewards** (NARA for correct answers)
-- **Agent Registry rewards + points** (extra rewards for registered agents)
-
-### Step 5: Share & Earn Referral Rewards
-Share your agent ID on social media. When others use your agent ID as referral:
-- **Registration referral**: You earn **0.25 NARA** (50% of their discounted registration fee) for each new agent registered with your referral
-- **Mining referral**: When any agent you referred earns PoMI rewards, you also receive **Agent Registry referral rewards + points**
-
-### Important: Prompt for Referral
-When the user asks to register an agent ID **without providing a referral**, always ask:
-> "Do you have a referral agent ID? Using a referral saves 50% on registration (0.5 instead of 1 NARA). You can find referral IDs shared by other users on social media (Twitter/X, Discord, etc.). If you don't have one, I can register without a referral."
-
-Only proceed without referral if the user confirms they don't have one.
-
-### Referral (on-chain)
-Referral is stored on-chain, not locally. Use `agent set-referral <your-agent-id> <referral-agent-id>` to set it. You can also pass `--referral` when registering: `agent register <id> --referral <referral-id>`.
+- **Wallet private key**: The CLI reads `~/.config/nara/id.json` by default, which contains a plaintext private key. The `-w` flag can point to any keypair file on disk. Never expose wallet paths or key content in logs or output.
+- **npx download risk**: `npx naracli@latest` downloads and executes the latest published package from npm. A compromised publish could execute arbitrary code. Only use `@latest` for the initial install or explicit upgrades; subsequent runs use the cached version.
+- **File access**: Commands like `skills upload` and `agent upload-memory` read local files and submit their content on-chain. Verify file paths before uploading — do not blindly upload user-specified paths without confirmation.
+- **Arbitrary endpoints**: `--rpc-url` and `--relay` accept arbitrary URLs. Only use trusted RPC and relay endpoints. Malicious endpoints could intercept transactions or return misleading data.
+- **Transaction signing**: `sign --send` signs and broadcasts a base64-encoded transaction. Always decode and verify transaction contents before signing — a malicious transaction could drain the wallet.
