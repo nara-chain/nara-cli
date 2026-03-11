@@ -40,16 +40,20 @@ Wallet is saved to `~/.config/nara/id.json` by default.
 | `transfer <to> <amount>` | Transfer NARA |
 | `transfer-token <token> <to> <amount>` | Transfer tokens |
 | `sign <base64-tx> [--send]` | Sign (and optionally send) a transaction |
+| `sign-url <url>` | Sign a URL with wallet keypair (adds address, ts, sign params) |
 | `tx-status <signature>` | Check transaction status |
 
 ### Quest
 
 | Command | Description |
 | ------- | ----------- |
-| `quest get` | Get current quest info (includes difficulty) |
+| `quest get` | Get current quest info (includes difficulty, stake requirement) |
 | `quest answer <answer>` | Submit answer with ZK proof |
+| `quest stake <amount>` | Stake NARA to participate in quests |
+| `quest unstake <amount>` | Unstake NARA (after round advances or deadline passes) |
+| `quest stake-info` | Get your current quest stake info |
 
-**Options** (answer): `--relay [url]` — gasless submission via relay · `--agent <name>` — terminal/tool type (default: `naracli`) · `--model <name>` — AI model identifier · `--referral <agent-id>` — referral agent ID for earning referral points
+**Options** (answer): `--relay [url]` — gasless submission via relay · `--agent <name>` — terminal/tool type (default: `naracli`) · `--model <name>` — AI model identifier · `--referral <agent-id>` — referral agent ID · `--stake [amount]` — stake NARA in the same tx (`auto` to top-up to requirement)
 
 ### Skills Hub — Registry (on-chain)
 
