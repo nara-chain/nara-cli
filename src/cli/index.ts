@@ -22,7 +22,7 @@ import {
   handleTransferToken,
 } from "./commands/wallet";
 import { loadWallet, getRpcUrl } from "./utils/wallet";
-import { NaraSDK } from "nara-sdk";
+import { NaraSDK, signUrl } from "nara-sdk";
 import { printError, printInfo, printSuccess } from "./utils/output";
 import type {
   GlobalOptions,
@@ -165,6 +165,31 @@ export function registerCommands(program: Command): void {
       const opts = program.opts() as TransferTokenOptions;
       try {
         await handleTransferToken(tokenAddress, to, amount, { ...opts, decimals: options.decimals ? parseInt(options.decimals) : undefined, exportTx: options.exportTx });
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // Top-level: sign-url
+  program
+    .command("sign-url <url>")
+    .description("Sign a URL with wallet keypair (adds address, ts, sign params)")
+    .action(async (url: string) => {
+      const opts = program.opts() as GlobalOptions;
+      try {
+        const wallet = await loadWallet(opts.wallet);
+        // Extract existing query params so they're included in the signature
+        const parsed = new URL(url);
+        const params: Record<string, string> = {};
+        parsed.searchParams.forEach((v, k) => { params[k] = v; });
+        parsed.search = "";
+        const signed = signUrl(parsed.toString(), wallet, params);
+        if (opts.json) {
+          console.log(JSON.stringify({ url: signed }, null, 2));
+        } else {
+          console.log(signed);
+        }
       } catch (error: any) {
         printError(error.message);
         process.exit(1);

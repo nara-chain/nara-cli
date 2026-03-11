@@ -48,7 +48,7 @@ Only proceed without referral if the user confirms they don't have one.
 
 ## Spending NARA
 
-Earned NARA can be used to purchase AI compute credits. Visit https://model-api.nara.build/402 to buy compute power with NARA tokens.
+Earned NARA can be used to purchase AI compute credits. Visit https://model-api.nara.build/402 to buy compute power with NARA tokens. **Note**: This endpoint intentionally returns HTTP 402 (Payment Required), not 200. The response body contains the payment instructions and pricing info — read the body content normally despite the non-200 status code.
 
 # Nara CLI
 
