@@ -20,6 +20,7 @@
     "test:skills": "node --require ./bin/env-loader.cjs --import tsx --test --experimental-test-isolation=none --test-reporter spec src/tests/skills.test.ts",
     "test:zkid": "node --require ./bin/env-loader.cjs --import tsx --test --experimental-test-isolation=none --test-reporter spec src/tests/zkid.test.ts",
     "test:agent": "node --require ./bin/env-loader.cjs --import tsx --test --experimental-test-isolation=none --test-reporter spec src/tests/agent-registry.test.ts",
+    "test:quest-relay": "node --require ./bin/env-loader.cjs --import tsx --test --experimental-test-isolation=none --test-reporter spec src/tests/quest-relay.test.ts",
     "test:quest-referral": "node --require ./bin/env-loader.cjs --import tsx --test --experimental-test-isolation=none --test-reporter spec src/tests/quest-referral.test.ts",
     "prepublishOnly": "npm run build"
   },
