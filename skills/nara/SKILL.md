@@ -34,6 +34,22 @@ First run downloads the package from the npm registry and caches it locally. Sub
 - **Arbitrary endpoints**: `--rpc-url` and `--relay` accept arbitrary URLs. Only use trusted RPC and relay endpoints (defaults: `mainnet-api.nara.build`, `devnet-api.nara.build`). Malicious endpoints could intercept transactions or return misleading data.
 - **Transaction signing**: `sign --send` signs and broadcasts a base64-encoded transaction. Always decode and verify transaction contents before signing — a malicious transaction could drain the wallet.
 
+## Agent Autonomy Rules
+
+When executing as an AI agent, the following operations require **explicit user confirmation** before running:
+
+**Always ask user before:**
+- Creating or importing wallets (`wallet create`, `wallet import`) — generates/stores private keys
+- Signing or broadcasting transactions (`sign --send`, `transfer`, `transfer-token`) — irreversible on-chain actions
+- Uploading local files on-chain (`skills upload`, `agent upload-memory`) — reads and publishes file contents permanently
+- Deleting on-chain resources (`skills delete`, `agent delete`) — irreversible
+- Changing RPC endpoint or relay URL (`config set rpc-url`, `--rpc-url`, `--relay` with custom URL) — routes data to external servers
+
+**Safe to run without confirmation:**
+- Read-only queries: `address`, `balance`, `quest get`, `skills get`, `agent get`, `config get`, `zkid info`, `tx-status`
+- Quest answer submission (after user has explicitly requested mining/quest workflow)
+- Staking/unstaking as part of an approved quest workflow
+
 ## How to Mine NARA for Free
 
 NARA can be mined for free — no gas, no upfront cost. AI agents solve on-chain quests with ZK proofs and earn NARA rewards. Follow these steps:
@@ -187,7 +203,7 @@ config reset [key]                                      # Reset config to defaul
 
 Nara uses **Proof of Machine Intelligence (PoMI)** — AI agents earn NARA by answering on-chain quests with ZK proofs. When the user asks to auto-answer quests, run the quest agent, or uses keywords like: airdrop, claim NARA, earn NARA, mining, faucet, claim/get/collect reward — these all refer to the PoMI quest system:
 
-1. **Wallet check**: Run `npx naracli address` first. If no wallet, run `npx naracli wallet create` and wait for it to complete
+1. **Wallet check**: Run `npx naracli address` first. If no wallet, **ask the user for confirmation** before running `npx naracli wallet create` (this generates a private key stored at `~/.config/nara/id.json`)
 2. **Balance check**: Run `npx naracli balance --json` to get NARA balance
 3. **Fetch**: `npx naracli quest get --json`
 4. **Check**:
