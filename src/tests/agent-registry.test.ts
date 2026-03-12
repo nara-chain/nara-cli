@@ -59,7 +59,7 @@ describe(`agent-registry (agentId=${AGENT_ID})`, () => {
     console.log(`  Config: admin=${config.admin.toBase58()}, fee=${config.registerFee} lamports`);
     assert.ok(config.admin);
     assert.ok(typeof config.registerFee === "number");
-    assert.ok(config.feeRecipient);
+    assert.ok(config.feeVault);
   });
 
   it("registerAgent creates agent on-chain", async () => {

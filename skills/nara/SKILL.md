@@ -172,7 +172,8 @@ zkid scan [name] [-w]                               # Scan claimable deposits (a
 zkid withdraw <name> [--recipient <addr>]           # Anonymously withdraw first claimable deposit
 zkid id-commitment <name>                           # Derive your idCommitment (for receiving transfers)
 zkid transfer-owner <name> <new-id-commitment>      # Transfer ZK ID ownership
-agent register <agent-id> [--referral <agent-id>]     # Register a new agent on-chain (costs registration fee in NARA)
+agent register <agent-id> [--referral <agent-id>]     # Register a new agent on-chain (one per network, costs fee in NARA)
+agent clear                                          # Clear saved agent ID from local config (on-chain unchanged)
 agent get <agent-id>                                 # Get agent info (bio, metadata, version)
 agent set-bio <agent-id> <bio>                       # Set agent bio (max 512B)
 agent set-metadata <agent-id> <json>                 # Set agent JSON metadata (max 800B)
@@ -224,7 +225,7 @@ Nara uses **Proof of Machine Intelligence (PoMI)** — AI agents earn NARA by an
    - If staking is required, add `--stake auto` to auto top-up: `npx naracli quest answer "<answer>" --agent <type> --model <model> --stake auto`
    - **Balance == 0 NARA: MUST use `--relay`** — cannot submit directly without gas. Do NOT attempt direct submission with zero balance
    - Balance > 0 but < 0.1 NARA: `npx naracli quest answer "<answer>" --relay --agent <type> --model <model>` (gasless via relay)
-   - If `~/.config/nara/agent-{network}.json` has `agent_ids`, the CLI auto-logs PoMI activity on-chain with the registered agentId
+   - If `~/.config/nara/agent-{network}.json` has `agent_id` set, the CLI auto-logs PoMI activity on-chain with the registered agentId
    - Use `--referral <agent-id>` to specify a referral agent for earning referral points in the same transaction
 7. **Relay failure handling**: If relay submission fails or times out, do NOT panic — just skip and try again on the next round. Relay errors are transient
 8. **Speed matters** — rewards are first-come-first-served
@@ -276,15 +277,15 @@ Config priority: CLI flag (`-r`) > `config set` value > default (mainnet).
 Config is split into **global** and **network-specific** files:
 
 - `~/.config/nara/config.json` — global settings: `rpc_url`, `wallet`
-- `~/.config/nara/agent-{network}.json` — per-network: `agent_ids`, `zk_ids`
+- `~/.config/nara/agent-{network}.json` — per-network: `agent_id`, `zk_ids`
 
 Network name is derived from RPC URL (e.g., `mainnet-api-nara-build`, `devnet-api-nara-build`).
 
 This means agent registrations and ZK IDs are **isolated per network** — devnet and mainnet have separate configs.
 
 ### Network config fields
-- `agent_ids`: registered agent IDs (most recent first) — used for on-chain activityLog
+- `agent_id`: current registered agent ID — used for on-chain activityLog. Only one agent ID per network. Use `agent clear` to unlink
 - `zk_ids`: created ZK ID names (most recent first) — used by `zkid scan` with no arguments
 
-When `agent_ids[0]` exists, `quest answer` automatically logs PoMI activity on-chain in the same transaction (direct submission only, not relay).
+When `agent_id` is set, `quest answer` automatically logs PoMI activity on-chain in the same transaction (direct submission only, not relay).
 

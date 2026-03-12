@@ -88,8 +88,7 @@ describe("quest referral (on-chain)", { skip: !hasWallet ? "no PRIVATE_KEY" : un
     try { unlinkSync(referralWalletPath); } catch {}
   });
 
-  // Register referral agent FIRST so that main agent ends up as agent_ids[0] in config.
-  // (addAgentId prepends, so the last registered becomes agent_ids[0])
+  // Register referral agent FIRST (uses separate wallet, won't conflict with main agent_id)
   it("registers referral agent with referral wallet", async () => {
     console.log(`  Registering referral agent "${referralAgentId}"...`);
     const { stdout, stderr, exitCode } = await runCli([

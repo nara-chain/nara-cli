@@ -2,7 +2,7 @@
  * Agent config utilities
  *
  * Global config:  ~/.config/nara/config.json        — rpc_url, wallet
- * Network config: ~/.config/nara/agent-{network}.json — agent_ids, zk_ids
+ * Network config: ~/.config/nara/agent-{network}.json — agent_id, zk_ids
  *
  * {network} is derived from the effective RPC URL:
  *   https://mainnet-api.nara.build/ → mainnet-api-nara-build
@@ -67,14 +67,14 @@ export function getConfiguredRpcUrl(): string {
   return global.rpc_url || DEFAULT_RPC_URL;
 }
 
-// ─── Network config (agent_ids, zk_ids) ──────────────────────────
+// ─── Network config (agent_id, zk_ids) ───────────────────────────
 
 export interface NetworkConfig {
-  agent_ids: string[];
+  agent_id: string;
   zk_ids: string[];
 }
 
-const DEFAULT_NETWORK_CONFIG: NetworkConfig = { agent_ids: [], zk_ids: [] };
+const DEFAULT_NETWORK_CONFIG: NetworkConfig = { agent_id: "", zk_ids: [] };
 
 /**
  * Load network-specific config.
@@ -87,7 +87,7 @@ export function loadNetworkConfig(rpcUrl?: string): NetworkConfig {
     const raw = readFileSync(path, "utf-8");
     const parsed = JSON.parse(raw);
     return {
-      agent_ids: Array.isArray(parsed.agent_ids) ? parsed.agent_ids : [],
+      agent_id: typeof parsed.agent_id === "string" ? parsed.agent_id : "",
       zk_ids: Array.isArray(parsed.zk_ids) ? parsed.zk_ids : [],
     };
   } catch {
@@ -107,9 +107,15 @@ export function saveNetworkConfig(config: NetworkConfig, rpcUrl?: string): void 
 
 // ─── Convenience helpers ─────────────────────────────────────────
 
-export function addAgentId(id: string, rpcUrl?: string): void {
+export function setAgentId(id: string, rpcUrl?: string): void {
   const config = loadNetworkConfig(rpcUrl);
-  config.agent_ids = [id, ...config.agent_ids.filter((x) => x !== id)];
+  config.agent_id = id;
+  saveNetworkConfig(config, rpcUrl);
+}
+
+export function clearAgentId(rpcUrl?: string): void {
+  const config = loadNetworkConfig(rpcUrl);
+  config.agent_id = "";
   saveNetworkConfig(config, rpcUrl);
 }
 
@@ -135,7 +141,7 @@ export function migrateIfNeeded(rpcUrl?: string): void {
 
     // Migrate network-specific fields
     const networkConfig: NetworkConfig = {
-      agent_ids: Array.isArray(parsed.agent_ids) ? parsed.agent_ids : [],
+      agent_id: typeof parsed.agent_id === "string" ? parsed.agent_id : "",
       zk_ids: Array.isArray(parsed.zk_ids) ? parsed.zk_ids : [],
     };
     saveNetworkConfig(networkConfig, url);

@@ -93,7 +93,7 @@ describe("config get", () => {
     assert.ok(typeof data.rpc_url === "string");
     assert.ok(typeof data.wallet === "string");
     assert.ok(typeof data.network === "string");
-    assert.ok(Array.isArray(data.agent_ids));
+    assert.ok(data.agent_id === null || typeof data.agent_id === "string");
     assert.ok(Array.isArray(data.zk_ids));
   });
 });

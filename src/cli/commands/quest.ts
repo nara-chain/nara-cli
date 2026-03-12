@@ -157,7 +157,7 @@ async function handleQuestAnswer(
   const connection = new Connection(rpcUrl, "confirmed");
   const wallet = await loadWallet(options.wallet);
   const networkConfig = loadNetworkConfig(rpcUrl);
-  const configAgentId = networkConfig.agent_ids[0];
+  const configAgentId = networkConfig.agent_id;
   const agent = options.agent ?? "naracli";
   const model = options.model ?? "";
   const referral = options.referral;

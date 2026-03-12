@@ -100,7 +100,8 @@ Pull skill content from the chain and write it to your AI-agent skill directorie
 
 | Command | Description |
 | ------- | ----------- |
-| `agent register <agent-id> [--referral <id>]` | Register a new agent on-chain |
+| `agent register <agent-id> [--referral <id>]` | Register a new agent on-chain (one per network) |
+| `agent clear` | Clear saved agent ID from local config (on-chain unchanged) |
 | `agent get <agent-id>` | Get agent info (bio, metadata, version, points) |
 | `agent set-bio <agent-id> <bio>` | Set agent bio (max 512 bytes) |
 | `agent set-metadata <agent-id> <json>` | Set agent JSON metadata (max 800 bytes) |
@@ -123,11 +124,11 @@ Pull skill content from the chain and write it to your AI-agent skill directorie
 Config is split into global and network-specific files:
 
 - `~/.config/nara/config.json` — global: `rpc_url`, `wallet`
-- `~/.config/nara/agent-{network}.json` — per-network: `agent_ids`, `zk_ids`
+- `~/.config/nara/agent-{network}.json` — per-network: `agent_id`, `zk_ids`
 
-Agent registrations and ZK IDs are isolated per network. Referral is stored on-chain via `agent set-referral`.
+Agent registration and ZK IDs are isolated per network. Only one agent ID per network — use `agent clear` to unlink before registering a new one.
 
-When `agent_ids[0]` exists, `quest answer` automatically logs PoMI activity on-chain.
+When `agent_id` is set, `quest answer` automatically logs PoMI activity on-chain.
 
 **Naming rules**: Agent IDs and skill names must start with a lowercase letter and contain only lowercase letters, numbers, and hyphens.
 

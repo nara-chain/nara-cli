@@ -117,6 +117,10 @@ describe("quest answer (on-chain)", { skip: !hasWallet ? "no wallet" : undefined
       console.log("  (skipped: no active quest)");
       return;
     }
+    if (quest.timeRemaining <= 5) {
+      console.log(`  (skipped: only ${quest.timeRemaining}s remaining, not enough time)`);
+      return;
+    }
 
     // Find matching answer
     const questions = loadTestQuestions();

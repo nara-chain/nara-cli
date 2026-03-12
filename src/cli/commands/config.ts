@@ -26,7 +26,7 @@ function handleConfigGet(options: GlobalOptions) {
     rpc_url_custom: !!globalConfig.rpc_url,
     wallet_custom: !!globalConfig.wallet,
     network: networkName,
-    agent_ids: networkConfig.agent_ids,
+    agent_id: networkConfig.agent_id || null,
     zk_ids: networkConfig.zk_ids,
   };
 
@@ -37,8 +37,8 @@ function handleConfigGet(options: GlobalOptions) {
     console.log(`  RPC URL:  ${data.rpc_url}${data.rpc_url_custom ? "" : " (default)"}`);
     console.log(`  Wallet:   ${data.wallet}${data.wallet_custom ? "" : " (default)"}`);
     console.log(`  Network:  ${networkName}`);
-    if (networkConfig.agent_ids.length > 0)
-      console.log(`  Agents:   ${networkConfig.agent_ids.join(", ")}`);
+    if (networkConfig.agent_id)
+      console.log(`  Agent:    ${networkConfig.agent_id}`);
     if (networkConfig.zk_ids.length > 0)
       console.log(`  ZK IDs:   ${networkConfig.zk_ids.join(", ")}`);
     console.log("");

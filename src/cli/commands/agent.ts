@@ -29,7 +29,7 @@ import {
   setReferral as setReferralOnChain,
 } from "nara-sdk";
 import { readFileSync } from "node:fs";
-import { addAgentId } from "../utils/agent-config";
+import { loadNetworkConfig, setAgentId, clearAgentId } from "../utils/agent-config";
 import { validateName } from "../utils/validation";
 
 // ─── Command handlers ────────────────────────────────────────────
@@ -37,6 +37,14 @@ import { validateName } from "../utils/validation";
 async function handleAgentRegister(agentId: string, options: GlobalOptions & { referral?: string }) {
   validateName(agentId, "Agent ID");
   const rpcUrl = getRpcUrl(options.rpcUrl);
+
+  // Check if an agent ID is already configured for this network
+  const networkConfig = loadNetworkConfig(rpcUrl);
+  if (networkConfig.agent_id) {
+    printError(`Agent ID "${networkConfig.agent_id}" is already configured for this network. Run "agent clear" first to unlink it.`);
+    process.exit(1);
+  }
+
   const connection = new Connection(rpcUrl, "confirmed");
   const wallet = await loadWallet(options.wallet);
 
@@ -45,7 +53,7 @@ async function handleAgentRegister(agentId: string, options: GlobalOptions & { r
     ? await registerAgentWithReferral(connection, wallet, agentId, options.referral)
     : await registerAgent(connection, wallet, agentId);
   if (!options.json) printSuccess(`Agent "${agentId}" registered!`);
-  addAgentId(agentId, rpcUrl);
+  setAgentId(agentId, rpcUrl);
 
   if (options.json) {
     formatOutput({ agentId, referral: options.referral ?? null, signature: result.signature, agentPubkey: result.agentPubkey.toBase58() }, true);
@@ -271,6 +279,26 @@ async function handleAgentLog(
   }
 }
 
+async function handleAgentClear(options: GlobalOptions) {
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const networkConfig = loadNetworkConfig(rpcUrl);
+  if (!networkConfig.agent_id) {
+    if (options.json) {
+      formatOutput({ cleared: false, message: "No agent ID configured" }, true);
+    } else {
+      printWarning("No agent ID configured for this network");
+    }
+    return;
+  }
+  const oldId = networkConfig.agent_id;
+  clearAgentId(rpcUrl);
+  if (options.json) {
+    formatOutput({ cleared: true, agentId: oldId }, true);
+  } else {
+    printSuccess(`Agent ID "${oldId}" cleared from local config (on-chain record is unchanged)`);
+  }
+}
+
 // ─── Register commands ───────────────────────────────────────────
 
 export function registerAgentCommands(program: Command): void {
@@ -399,6 +427,20 @@ export function registerAgentCommands(program: Command): void {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
         await handleAgentDelete(agentId, globalOpts);
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // agent clear
+  agent
+    .command("clear")
+    .description("Clear saved agent ID from local config (does not delete on-chain)")
+    .action(async (_opts: any, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleAgentClear(globalOpts);
       } catch (error: any) {
         printError(error.message);
         process.exit(1);
