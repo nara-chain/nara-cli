@@ -2,6 +2,11 @@
   "name": "naracli",
   "version": "1.0.50",
   "description": "CLI for the Nara chain (Solana-compatible)",
+  "homepage": "https://nara.build",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nara-chain/nara-cli"
+  },
   "module": "index.ts",
   "main": "index.ts",
   "type": "module",

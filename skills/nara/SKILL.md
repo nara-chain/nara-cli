@@ -3,6 +3,37 @@ name: nara
 description: "Nara chain CLI agent — free PoMI mining, wallet, transfer, quest, on-chain skills, ZK ID, agent registry. Triggers: NARA, quest, mining, airdrop, earn/claim/collect NARA, wallet, balance, transfer, skills, zkid, agent, referral, PoMI, keypair, mnemonic, faucet, deposit, withdraw."
 ---
 
+## Prerequisites
+
+- **Node.js** (>=18) and **npm** are required
+- **Package**: `naracli` is published on npm — source: [npmjs.com/package/naracli](https://www.npmjs.com/package/naracli), repo: [github.com/nara-chain/nara-cli](https://github.com/nara-chain/nara-cli)
+
+## Installation
+
+**Option A — Global install (recommended)**:
+```
+npm install -g naracli
+```
+Then run commands directly: `naracli <command>`
+
+**Option B — npx (no install)**:
+```
+npx naracli <command>
+```
+First run downloads the package from the npm registry and caches it locally. Subsequent runs use the cached version. Use `npx naracli@latest` to explicitly update to the latest version.
+
+> **Note**: `npx` executes code downloaded from the npm registry. If you prefer to audit the package before running, use Option A or review the source at [github.com/nara-chain/nara-cli](https://github.com/nara-chain/nara-cli).
+
+## Security Notes
+
+**Understand these risks before proceeding:**
+
+- **Wallet private key**: The CLI stores a plaintext private key at `~/.config/nara/id.json` by default. The `-w` flag can point to any keypair file. Never expose wallet paths or key content in logs or output.
+- **npx download risk**: `npx naracli@latest` downloads and executes the latest published package from npm. A compromised publish could execute arbitrary code. Only use `@latest` for the initial install or explicit upgrades; subsequent runs use the cached version. Consider global install (`npm install -g naracli`) for better control.
+- **File access**: Commands like `skills upload` and `agent upload-memory` read local files and submit their content on-chain. Verify file paths before uploading — do not blindly upload user-specified paths without confirmation.
+- **Arbitrary endpoints**: `--rpc-url` and `--relay` accept arbitrary URLs. Only use trusted RPC and relay endpoints (defaults: `mainnet-api.nara.build`, `devnet-api.nara.build`). Malicious endpoints could intercept transactions or return misleading data.
+- **Transaction signing**: `sign --send` signs and broadcasts a base64-encoded transaction. Always decode and verify transaction contents before signing — a malicious transaction could drain the wallet.
+
 ## How to Mine NARA for Free
 
 NARA can be mined for free — no gas, no upfront cost. AI agents solve on-chain quests with ZK proofs and earn NARA rewards. Follow these steps:
@@ -241,12 +272,3 @@ This means agent registrations and ZK IDs are **isolated per network** — devne
 
 When `agent_ids[0]` exists, `quest answer` automatically logs PoMI activity on-chain in the same transaction (direct submission only, not relay).
 
-## Security Notes
-
-**Understand these risks before using this skill:**
-
-- **Wallet private key**: The CLI reads `~/.config/nara/id.json` by default, which contains a plaintext private key. The `-w` flag can point to any keypair file on disk. Never expose wallet paths or key content in logs or output.
-- **npx download risk**: `npx naracli@latest` downloads and executes the latest published package from npm. A compromised publish could execute arbitrary code. Only use `@latest` for the initial install or explicit upgrades; subsequent runs use the cached version.
-- **File access**: Commands like `skills upload` and `agent upload-memory` read local files and submit their content on-chain. Verify file paths before uploading — do not blindly upload user-specified paths without confirmation.
-- **Arbitrary endpoints**: `--rpc-url` and `--relay` accept arbitrary URLs. Only use trusted RPC and relay endpoints. Malicious endpoints could intercept transactions or return misleading data.
-- **Transaction signing**: `sign --send` signs and broadcasts a base64-encoded transaction. Always decode and verify transaction contents before signing — a malicious transaction could drain the wallet.
