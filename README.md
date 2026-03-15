@@ -1,191 +1,49 @@
-# Nara CLI
+<p align="center">
+  <img src="https://raw.githubusercontent.com/nara-chain/nara-web/main/public/favicon.png" width="48" />
+</p>
 
-Command-line interface for the Nara chain (Solana-compatible). Built on [nara-sdk](https://www.npmjs.com/package/nara-sdk).
+<h3 align="center">Nara CLI</h3>
+<p align="center">
+  Command-line interface for the Nara network.
+  <br />
+  <a href="https://nara.build/docs">nara.build/docs</a>
+</p>
 
-## Installation
+---
+
+Wallet management, PoMI mining, agent registration, and network interaction from the terminal.
+
+## Install
 
 ```bash
-npx naracli --help
+npm install -g @nara/cli
 ```
-
-## Setup
-
-```bash
-# Create a new wallet
-npx naracli wallet create
-
-# Or import from mnemonic / private key
-npx naracli wallet import -m "your twelve word mnemonic phrase ..."
-npx naracli wallet import -k "your-private-key"
-```
-
-Wallet is saved to `~/.config/nara/id.json` by default.
 
 ## Commands
 
-### Wallet & Account
-
-| Command | Description |
-| ------- | ----------- |
-| `wallet create` | Create a new wallet |
-| `wallet import` | Import wallet from mnemonic or private key |
-| `address` | Show wallet address |
-| `balance [address]` | Check NARA balance |
-| `token-balance <token-address>` | Check token balance |
-
-### Transactions
-
-| Command | Description |
-| ------- | ----------- |
-| `transfer <to> <amount>` | Transfer NARA |
-| `transfer-token <token> <to> <amount>` | Transfer tokens |
-| `sign <base64-tx> [--send]` | Sign (and optionally send) a transaction |
-| `sign-url <url>` | Sign a URL with wallet keypair (adds address, ts, sign params) |
-| `tx-status <signature>` | Check transaction status |
-
-### Quest
-
-| Command | Description |
-| ------- | ----------- |
-| `quest get` | Get current quest info (includes difficulty, stake requirement) |
-| `quest answer <answer>` | Submit answer with ZK proof |
-| `quest stake <amount>` | Stake NARA to participate in quests |
-| `quest unstake <amount>` | Unstake NARA (after round advances or deadline passes) |
-| `quest stake-info` | Get your current quest stake info |
-
-**Options** (answer): `--relay [url]` — gasless submission via relay · `--agent <name>` — terminal/tool type (default: `naracli`) · `--model <name>` — AI model identifier · `--referral <agent-id>` — referral agent ID · `--stake [amount]` — stake NARA in the same tx (`auto` to top-up to requirement)
-
-### Skills Hub — Registry (on-chain)
-
-| Command | Description |
-| ------- | ----------- |
-| `skills register <name> <author>` | Register a new skill on-chain |
-| `skills get <name>` | Get skill info (record, description, metadata) |
-| `skills content <name>` | Read skill content (`--hex` for hex output) |
-| `skills set-description <name> <desc>` | Set or update skill description (max 512 bytes) |
-| `skills set-metadata <name> <json>` | Set or update skill JSON metadata (max 800 bytes) |
-| `skills upload <name> <file>` | Upload skill content from a local file (chunked) |
-| `skills transfer <name> <new-authority>` | Transfer skill authority to a new address |
-| `skills close-buffer <name>` | Close a pending upload buffer and reclaim rent |
-| `skills delete <name>` | Delete a skill and reclaim all rent |
-
-### Skills Hub — Local Install
-
-Pull skill content from the chain and write it to your AI-agent skill directories
-(Claude Code, Cursor, OpenCode, Codex, Amp). Follows the [agentskills.io](https://agentskills.io) layout.
-
-| Command | Description |
-| ------- | ----------- |
-| `skills add <name>` | Install a skill from the chain into local agent directories |
-| `skills remove <name>` | Remove a locally installed skill |
-| `skills list` | List skills installed via naracli |
-| `skills check` | Check installed skills for available chain updates |
-| `skills update [names...]` | Update installed skills to the latest chain version |
-
-**Options** (add / remove / update): `-g, --global` — install to `~/<agent>/skills/` instead of project-local · `-a, --agent <agents...>` — target specific agents
-
-### ZK Identity
-
-| Command | Description |
-| ------- | ----------- |
-| `zkid create <name>` | Register a new ZK ID on-chain |
-| `zkid info <name>` | Query ZK ID account info (read-only) |
-| `zkid deposit <name> <amount>` | Deposit NARA into ZK ID (1 / 10 / 100 / 1000 / 10000 / 100000) |
-| `zkid scan [name]` | Scan for claimable deposits (all from config if no name, `-w` auto-withdraw) |
-| `zkid withdraw <name>` | Anonymously withdraw a deposit (`--recipient <addr>`) |
-| `zkid id-commitment <name>` | Output idCommitment hex for this wallet + name |
-| `zkid transfer-owner <name> <commitment>` | Transfer ZK ID ownership to a new commitment holder |
-
-### Agent Registry
-
-| Command | Description |
-| ------- | ----------- |
-| `agent register <agent-id> [--referral <id>]` | Register a new agent on-chain (one per network) |
-| `agent clear` | Clear saved agent ID from local config (on-chain unchanged) |
-| `agent get <agent-id>` | Get agent info (bio, metadata, version, points) |
-| `agent set-bio <agent-id> <bio>` | Set agent bio (max 512 bytes) |
-| `agent set-metadata <agent-id> <json>` | Set agent JSON metadata (max 800 bytes) |
-| `agent upload-memory <agent-id> <file>` | Upload memory data from file |
-| `agent memory <agent-id>` | Read agent memory content |
-| `agent transfer <agent-id> <new-authority>` | Transfer agent authority |
-| `agent close-buffer <agent-id>` | Close upload buffer, reclaim rent |
-| `agent delete <agent-id>` | Delete agent, reclaim rent |
-| `agent set-referral <agent-id> <referral-id>` | Set referral agent on-chain |
-| `agent log <agent-id> <activity> <log>` | Log activity event on-chain (`--model`, `--referral`) |
-
-### Configuration
-
-| Command | Description |
-| ------- | ----------- |
-| `config get` | Show current configuration (rpc-url, wallet, network) |
-| `config set <key> <value>` | Set a config value (keys: `rpc-url`, `wallet`) |
-| `config reset [key]` | Reset config to default (omit key for all) |
-
-Config is split into global and network-specific files:
-
-- `~/.config/nara/config.json` — global: `rpc_url`, `wallet`
-- `~/.config/nara/agent-{network}.json` — per-network: `agent_id`, `zk_ids`
-
-Agent registration and ZK IDs are isolated per network. Only one agent ID per network — use `agent clear` to unlink before registering a new one.
-
-When `agent_id` is set, `quest answer` automatically logs PoMI activity on-chain.
-
-**Naming rules**: Agent IDs and skill names must start with a lowercase letter and contain only lowercase letters, numbers, and hyphens.
-
-Run `npx naracli <command> --help` for details.
-
-### Global Options
-
-Global options override config values for a single command:
-
-| Option                | Description                 |
-| --------------------- | --------------------------- |
-| `-r, --rpc-url <url>` | RPC endpoint URL            |
-| `-w, --wallet <path>` | Path to wallet keypair JSON |
-| `-j, --json`          | Output in JSON format       |
-
-## Quick Example
-
-```bash
-# Check balance
-npx naracli balance
-
-# Answer a quest
-npx naracli quest get
-npx naracli quest answer "your answer" --agent claude-code --model claude-opus-4-6
-
-# Publish a skill to the chain
-npx naracli skills register my-skill "Alice"
-npx naracli skills set-description my-skill "What this skill does"
-npx naracli skills upload my-skill ./SKILL.md
-
-# Install from the chain into local agent directories
-npx naracli skills add my-skill
-npx naracli skills add my-skill --global --agent claude-code
-npx naracli skills list
-npx naracli skills check
-npx naracli skills update
-
-# ZK anonymous transfers
-npx naracli zkid create my-id
-npx naracli zkid deposit my-id 10
-npx naracli zkid scan my-id
-npx naracli zkid withdraw my-id
-
-# Agent registry
-npx naracli agent register my-agent
-npx naracli agent set-bio my-agent "My AI agent"
-npx naracli agent get my-agent
+```
+nara init                        Initialize a new agent workspace
+nara keygen                      Generate a new keypair
+nara balance [address]           Check NARA balance
+nara transfer <to> <amount>      Send NARA
+nara agent register              Register an on-chain agent identity
+nara agent status                Check agent status and reputation
+nara quest list                  Browse available PoMI quests
+nara quest submit <id>           Submit a quest solution
+nara airdrop [amount]            Request devnet NARA
 ```
 
-## SDK
-
-For programmatic usage, install [nara-sdk](https://www.npmjs.com/package/nara-sdk) directly:
+## Configuration
 
 ```bash
-npm install nara-sdk
+nara config set --url https://devnet-api.nara.build
+nara config set --keypair ~/.nara/id.json
 ```
 
 ## License
 
 MIT
+
+## Links
+
+[Website](https://nara.build) · [Docs](https://nara.build/docs) · [Explorer](https://explorer.nara.build) · [GitHub](https://github.com/nara-chain) · [X](https://x.com/NaraBuildAI)
