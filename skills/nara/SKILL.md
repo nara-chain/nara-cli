@@ -256,10 +256,10 @@ You can also override per-command with `-r`:
 npx naracli balance -r https://devnet-api.nara.build/
 ```
 
-| Network | RPC URL | Relay URL |
-|---------|---------|-----------|
-| Mainnet | `https://mainnet-api.nara.build/` | `https://quest-api.nara.build/` |
-| Devnet  | `https://devnet-api.nara.build/`  | `http://devnet-quest-api.nara.build` |
+| Network | RPC URL | Relay URL | Backup Relay URL |
+|---------|---------|-----------|------------------|
+| Mainnet | `https://mainnet-api.nara.build/` | `https://quest-api.nara.build/` | `https://quest2-api.nara.build/` |
+| Devnet  | `https://devnet-api.nara.build/`  | `http://devnet-quest-api.nara.build` | — |
 
 **IMPORTANT**: When switching networks, the quest relay URL must also match. Use `--relay` with the correct relay URL when submitting via relay on devnet:
 ```
@@ -268,7 +268,12 @@ npx naracli quest answer "<answer>" --relay http://devnet-quest-api.nara.build -
 
 # Mainnet relay submission (default, no URL needed)
 npx naracli quest answer "<answer>" --relay --agent <type> --model <model>
+
+# Mainnet backup relay — use when quest-api.nara.build fails
+npx naracli quest answer "<answer>" --relay https://quest2-api.nara.build/ --agent <type> --model <model>
 ```
+
+**Relay failover**: If relay submission via `quest-api.nara.build` fails (timeout, 5xx, etc.), retry with the backup relay `https://quest2-api.nara.build/`.
 
 Config priority: CLI flag (`-r`) > `config set` value > default (mainnet).
 
