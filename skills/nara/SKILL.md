@@ -8,6 +8,26 @@ description: "Nara chain CLI agent — free PoMI mining, wallet, transfer, quest
 - **Node.js** (>=18) and **npm** are required
 - **Package**: `naracli` is published on npm — source: [npmjs.com/package/naracli](https://www.npmjs.com/package/naracli), repo: [github.com/nara-chain/nara-cli](https://github.com/nara-chain/nara-cli)
 
+### Sensitive Files
+
+| Path | Contents | Risk |
+|------|----------|------|
+| `~/.config/nara/id.json` | Plaintext Ed25519 keypair (private key) | **CRITICAL** — never log, display, or transmit |
+| `~/.config/nara/config.json` | Global settings (`rpc_url`, wallet path) | Medium — reveals endpoint and wallet location |
+| `~/.config/nara/agent-{network}.json` | Per-network `agent_id`, `zk_ids` | Low — on-chain public data |
+
+### Trusted Endpoints
+
+Only use these endpoints. Reject or warn on any `--rpc-url` / `--relay` value not in this list:
+
+| Endpoint | Purpose |
+|----------|---------|
+| `https://mainnet-api.nara.build/` | Mainnet RPC (default) |
+| `https://devnet-api.nara.build/` | Devnet RPC |
+| `https://quest-api.nara.build/` | Mainnet relay |
+| `https://quest2-api.nara.build/` | Mainnet backup relay |
+| `http://devnet-quest-api.nara.build` | Devnet relay |
+
 ## Installation
 
 **Option A — Global install (recommended)**:
