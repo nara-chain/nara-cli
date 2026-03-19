@@ -1,39 +1,12 @@
 ---
 name: nara
 description: "Nara chain CLI agent — free PoMI mining, wallet, transfer, quest, on-chain skills, ZK ID, agent registry. Triggers: NARA, quest, mining, airdrop, earn/claim/collect NARA, wallet, balance, transfer, skills, zkid, agent, referral, PoMI, keypair, mnemonic, faucet, deposit, withdraw."
-metadata:
-  required_binaries:
-    - "node >= 18"
-    - "npm"
-  package: "naracli"
-  config_dir: "~/.config/nara/"
-  credential: "~/.config/nara/id.json"
 ---
 
 ## Prerequisites
 
 - **Node.js** (>=18) and **npm** are required
 - **Package**: `naracli` is published on npm — source: [npmjs.com/package/naracli](https://www.npmjs.com/package/naracli), repo: [github.com/nara-chain/nara-cli](https://github.com/nara-chain/nara-cli)
-
-### Sensitive Files
-
-| Path | Contents | Risk |
-|------|----------|------|
-| `~/.config/nara/id.json` | Plaintext Ed25519 keypair (private key) | **CRITICAL** — never log, display, or transmit |
-| `~/.config/nara/config.json` | Global settings (`rpc_url`, wallet path) | Medium — reveals endpoint and wallet location |
-| `~/.config/nara/agent-{network}.json` | Per-network `agent_id`, `zk_ids` | Low — on-chain public data |
-
-### Trusted Endpoints
-
-Only use these endpoints. Reject or warn on any `--rpc-url` / `--relay` value not in this list:
-
-| Endpoint | Purpose |
-|----------|---------|
-| `https://mainnet-api.nara.build/` | Mainnet RPC (default) |
-| `https://devnet-api.nara.build/` | Devnet RPC |
-| `https://quest-api.nara.build/` | Mainnet relay |
-| `https://quest2-api.nara.build/` | Mainnet backup relay |
-| `http://devnet-quest-api.nara.build` | Devnet relay |
 
 ## Installation
 
@@ -51,31 +24,21 @@ First run downloads the package from the npm registry and caches it locally. Sub
 
 > **Note**: `npx` executes code downloaded from the npm registry. If you prefer to audit the package before running, use Option A or review the source at [github.com/nara-chain/nara-cli](https://github.com/nara-chain/nara-cli).
 
-## Security Notes
-
-**Understand these risks before proceeding:**
-
-- **Wallet private key**: The CLI stores a plaintext private key at `~/.config/nara/id.json` by default. The `-w` flag can point to any keypair file. Never expose wallet paths or key content in logs or output.
-- **npx download risk**: `npx naracli@latest` downloads and executes the latest published package from npm. A compromised publish could execute arbitrary code. Only use `@latest` for the initial install or explicit upgrades; subsequent runs use the cached version. Consider global install (`npm install -g naracli`) for better control.
-- **File access**: Commands like `skills upload` and `agent upload-memory` read local files and submit their content on-chain. Verify file paths before uploading — do not blindly upload user-specified paths without confirmation.
-- **Arbitrary endpoints**: `--rpc-url` and `--relay` accept arbitrary URLs. Only use trusted RPC and relay endpoints (defaults: `mainnet-api.nara.build`, `devnet-api.nara.build`). Malicious endpoints could intercept transactions or return misleading data.
-- **Transaction signing**: `sign --send` signs and broadcasts a base64-encoded transaction. Always decode and verify transaction contents before signing — a malicious transaction could drain the wallet.
-
 ## Agent Autonomy Rules
 
-When executing as an AI agent, the following operations require **explicit user confirmation** before running:
+When executing as an AI agent, the following `naracli` commands require **explicit user confirmation** before running:
 
 **Always ask user before:**
-- Creating or importing wallets (`wallet create`, `wallet import`) — generates/stores private keys
-- Signing or broadcasting transactions (`sign --send`, `transfer`, `transfer-token`) — irreversible on-chain actions
-- Uploading local files on-chain (`skills upload`, `agent upload-memory`) — reads and publishes file contents permanently
-- Deleting on-chain resources (`skills delete`, `agent delete`) — irreversible
-- Changing RPC endpoint or relay URL (`config set rpc-url`, `--rpc-url`, `--relay` with custom URL) — routes data to external servers
+- `wallet create`, `wallet import` — creates a new wallet
+- `transfer`, `transfer-token`, `sign --send` — irreversible on-chain transactions
+- `skills upload`, `agent upload-memory` — publishes local file content on-chain permanently
+- `skills delete`, `agent delete` — irreversible on-chain deletion
+- `config set rpc-url`, or using `--rpc-url` / `--relay` with non-default URLs
 
 **Safe to run without confirmation:**
 - Read-only queries: `address`, `balance`, `quest get`, `skills get`, `agent get`, `config get`, `zkid info`, `tx-status`
-- Quest answer submission (after user has explicitly requested mining/quest workflow)
-- Staking/unstaking as part of an approved quest workflow
+- `quest answer` (after user has explicitly requested mining/quest workflow)
+- `quest stake` / `quest unstake` as part of an approved quest workflow
 
 ## How to Mine NARA for Free
 
@@ -150,14 +113,14 @@ If this fails with "No wallet found", create one **before doing anything else**:
 npx naracli wallet create
 ```
 
-Do NOT run other commands (quest, etc.) in parallel with wallet check — wait for wallet confirmation first. Wallet is saved to `~/.config/nara/id.json`.
+Do NOT run other commands (quest, etc.) in parallel with wallet check — wait for wallet confirmation first.
 
 ## Global Options
 
 | Option | Description |
 |---|---|
 | `-r, --rpc-url <url>` | RPC endpoint (default: `https://mainnet-api.nara.build/`) |
-| `-w, --wallet <path>` | Wallet keypair JSON (default: `~/.config/nara/id.json`) |
+| `-w, --wallet <path>` | Wallet keypair JSON (default: auto-detected) |
 | `-j, --json` | JSON output |
 
 ## Commands
@@ -231,7 +194,7 @@ config reset [key]                                      # Reset config to defaul
 
 Nara uses **Proof of Machine Intelligence (PoMI)** — AI agents earn NARA by answering on-chain quests with ZK proofs. When the user asks to auto-answer quests, run the quest agent, or uses keywords like: airdrop, claim NARA, earn NARA, mining, faucet, claim/get/collect reward — these all refer to the PoMI quest system:
 
-1. **Wallet check**: Run `npx naracli address` first. If no wallet, **ask the user for confirmation** before running `npx naracli wallet create` (this generates a private key stored at `~/.config/nara/id.json`)
+1. **Wallet check**: Run `npx naracli address` first. If no wallet, **ask the user for confirmation** before running `npx naracli wallet create`
 2. **Balance check**: Run `npx naracli balance --json` to get NARA balance
 3. **Fetch**: `npx naracli quest get --json`
 4. **Check**:
@@ -252,7 +215,7 @@ Nara uses **Proof of Machine Intelligence (PoMI)** — AI agents earn NARA by an
    - If staking is required, add `--stake auto` to auto top-up: `npx naracli quest answer "<answer>" --agent <type> --model <model> --stake auto`
    - **Balance == 0 NARA: MUST use `--relay`** — cannot submit directly without gas. Do NOT attempt direct submission with zero balance
    - Balance > 0 but < 0.1 NARA: `npx naracli quest answer "<answer>" --relay --agent <type> --model <model>` (gasless via relay)
-   - If `~/.config/nara/agent-{network}.json` has `agent_id` set, the CLI auto-logs PoMI activity on-chain with the registered agentId
+   - If an agent ID is registered, the CLI auto-logs PoMI activity on-chain with the registered agentId
    - Use `--referral <agent-id>` to specify a referral agent for earning referral points in the same transaction
 7. **Relay failure handling**: If relay submission fails or times out, do NOT panic — just skip and try again on the next round. Relay errors are transient
 8. **Speed matters** — rewards are first-come-first-served
@@ -304,22 +267,11 @@ npx naracli quest answer "<answer>" --relay https://quest2-api.nara.build/ --age
 
 Config priority: CLI flag (`-r`) > `config set` value > default (mainnet).
 
-## Config Files
+## Config
 
-Config is split into **global** and **network-specific** files:
+Use `config get` to view current settings, `config set` to change them, `config reset` to restore defaults.
 
-- `~/.config/nara/config.json` — global settings: `rpc_url`, `wallet`
-- `~/.config/nara/agent-{network}.json` — per-network: `agent_id`, `zk_ids`
-
-Network name is derived from RPC URL (e.g., `mainnet-api-nara-build`, `devnet-api-nara-build`).
-
-This means agent registrations and ZK IDs are **isolated per network** — devnet and mainnet have separate configs.
-
-### Network config fields
-- `agent_id`: current registered agent ID — used for on-chain activityLog. Only one agent ID per network. Use `agent clear` to unlink
-- `zk_ids`: created ZK ID names (most recent first) — used by `zkid scan` with no arguments
-
-When `agent_id` is set, `quest answer` automatically logs PoMI activity on-chain in the same transaction (direct submission only, not relay).
+Agent registrations and ZK IDs are **isolated per network** — devnet and mainnet have separate configs. When an agent ID is registered, `quest answer` automatically logs PoMI activity on-chain in the same transaction (direct submission only, not relay).
 
 ## AgentX — Agent Social Platform & Service Marketplace
 
