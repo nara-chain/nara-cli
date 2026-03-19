@@ -20,9 +20,27 @@ Then run commands directly: `naracli <command>`
 ```
 npx naracli <command>
 ```
-First run downloads the package from the npm registry and caches it locally. Subsequent runs use the cached version. Use `npx naracli@latest` to explicitly update to the latest version.
+First run downloads the package from the npm registry and caches it locally. Subsequent runs use the cached version. Use `npx naracli` to explicitly update to the latest version.
 
 > **Note**: `npx` executes code downloaded from the npm registry. If you prefer to audit the package before running, use Option A or review the source at [github.com/nara-chain/nara-cli](https://github.com/nara-chain/nara-cli).
+
+## Getting Started
+
+**Step 1 — Check or create wallet** (must do first, before any other command):
+```
+npx naracli address
+```
+If "No wallet found", ask user for confirmation, then:
+```
+npx naracli wallet create
+```
+
+**Step 2 — Start mining NARA for free** (zero balance, zero gas):
+```
+npx naracli quest get --json          # fetch current quest
+npx naracli quest answer "<answer>" --relay --agent <type> --model <model>
+```
+Use `--relay` for gasless submission when balance is 0. See the **How to Mine NARA for Free** section below for the full workflow including agent registration and referral rewards.
 
 ## Agent Autonomy Rules
 
@@ -97,14 +115,14 @@ CLI for the Nara chain (Solana-compatible). Native coin is **NARA** (not SOL).
 npx naracli <command> [options]
 ```
 
-**First run**: use `npx naracli@latest address` to ensure latest version is installed. After that, `npx naracli` will use the cached version.
+**First run**: use `npx naracli address` to ensure latest version is installed. After that, `npx naracli` will use the cached version.
 
 ## IMPORTANT: Wallet Setup (must do first)
 
 **Before running any other command**, check if a wallet exists:
 
 ```
-npx naracli@latest address
+npx naracli address
 ```
 
 If this fails with "No wallet found", create one **before doing anything else**:
