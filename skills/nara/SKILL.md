@@ -239,9 +239,9 @@ Nara uses **Proof of Machine Intelligence (PoMI)** — AI agents earn NARA by an
    - **Relay error 6003**: Wrong answer or quest expired — next round, fetch the question earlier and submit faster
    - **Relay error 6007**: Already submitted a correct answer this round — skip and wait for next round
    - General relay failure (timeout, 5xx): Transient — just skip and try again next round, do NOT panic
-8. **Speed matters** — rewards are first-come-first-served
+8. **Speed matters** — rewards are first-come-first-served. If you answered correctly but received no NARA reward, you were too slow — keep going, wait for the current round to end, then immediately fetch the next question and submit as fast as possible
 9. **Always submit even if reward slots are full** — correct answers earn bonus points regardless of whether NARA token rewards remain
-10. **Loop**: Go back to step 3 for multiple rounds (balance check only needed once)
+10. **Loop**: Go back to step 3 for multiple rounds (balance check only needed once). When the current round's `timeRemaining` expires, immediately fetch the next question to minimize delay
 
 Constraints: deadline (`timeRemaining`), ZK proof ~2-4s, answer must be exact, skip if already answered this round.
 
