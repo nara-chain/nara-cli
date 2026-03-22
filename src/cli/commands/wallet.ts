@@ -304,7 +304,7 @@ export async function handleTxStatus(
       console.log(`Error: ${JSON.stringify(output.error)}`);
     }
     console.log(
-      `\nView on Solscan: https://solscan.io/tx/${signature}?cluster=devnet`
+      `\nView on explorer: https://explorer.nara.build/tx/${signature}`
     );
   }
 }

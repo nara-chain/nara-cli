@@ -334,7 +334,7 @@ async function handleReward(
   } catch {
     printWarning("Failed to fetch transaction details. Please check manually later.");
     console.log(
-      `  https://solscan.io/tx/${txSignature}?cluster=devnet`
+      `  https://explorer.nara.build/tx/${txSignature}`
     );
     return;
   }

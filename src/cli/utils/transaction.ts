@@ -151,7 +151,7 @@ export function printTransactionResult(
       printSuccess("Transaction successful!");
       console.log(`Signature: ${result.signature}`);
       console.log(
-        `View on Solscan: https://solscan.io/tx/${result.signature}?cluster=devnet`
+        `View on explorer: https://explorer.nara.build/tx/${result.signature}`
       );
     }
   } else if (result.base64) {
