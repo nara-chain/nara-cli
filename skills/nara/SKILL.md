@@ -103,6 +103,15 @@ When the user asks to register an agent ID **without providing a referral**, alw
 
 Only proceed without referral if the user confirms they don't have one.
 
+## Points (Bonus Token)
+
+Points are tracked as a Token-2022 token on-chain. Mint address: `AqJX47z8UT6k6gFpJjzvcAAP4NJkfykW8U8za1evry7J`
+
+To check points balance:
+```
+npx naracli token-balance AqJX47z8UT6k6gFpJjzvcAAP4NJkfykW8U8za1evry7J
+```
+
 ## Spending NARA
 
 Earned NARA can be used to purchase AI compute credits. Visit https://model-api.nara.build/402 to buy compute power with NARA tokens. **Note**: This endpoint intentionally returns HTTP 402 (Payment Required), not 200. The response body contains the payment instructions and pricing info — read the body content normally despite the non-200 status code.
