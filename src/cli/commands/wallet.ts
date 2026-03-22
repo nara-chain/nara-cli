@@ -14,6 +14,7 @@ import {
   getAssociatedTokenAddress,
   createTransferInstruction,
   TOKEN_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID,
 } from "@solana/spl-token";
 import * as bip39 from "bip39";
 import { derivePath } from "ed25519-hd-key";
@@ -176,8 +177,17 @@ export async function handleTokenBalance(
   printInfo(`Owner: ${owner.toBase58()}`);
   printInfo(`Token: ${tokenAddress}`);
 
+  // Detect token program (SPL Token vs Token-2022) by checking mint account owner
+  const mintAccountInfo = await connection.getAccountInfo(tokenMint);
+  if (!mintAccountInfo) {
+    throw new Error(`Token mint ${tokenAddress} not found on chain`);
+  }
+  const tokenProgramId = mintAccountInfo.owner.equals(TOKEN_2022_PROGRAM_ID)
+    ? TOKEN_2022_PROGRAM_ID
+    : TOKEN_PROGRAM_ID;
+
   // Get associated token account
-  const tokenAccount = await getAssociatedTokenAddress(tokenMint, owner);
+  const tokenAccount = await getAssociatedTokenAddress(tokenMint, owner, true, tokenProgramId);
 
   // Get token account balance
   try {
