@@ -85,7 +85,7 @@ export function registerCommands(program: Command): void {
   // Top-level: address
   program
     .command("address")
-    .description("Show wallet address")
+    .description("Show wallet public address (run this first to check if a wallet exists)")
     .action(async () => {
       const opts = program.opts() as GlobalOptions;
       try {
@@ -99,7 +99,7 @@ export function registerCommands(program: Command): void {
   // Top-level: balance
   program
     .command("balance")
-    .description("Check NARA balance")
+    .description("Check NARA balance (native coin, not SOL)")
     .argument("[address]", "Wallet address (optional, defaults to current wallet)")
     .action(async (address: string | undefined) => {
       const opts = program.opts() as WalletBalanceOptions;
@@ -114,7 +114,7 @@ export function registerCommands(program: Command): void {
   // Top-level: token-balance
   program
     .command("token-balance <token-address>")
-    .description("Check token balance")
+    .description("Check token balance (supports SPL Token and Token-2022)")
     .option("--owner <address>", "Owner address (optional, defaults to current wallet)")
     .action(async (tokenAddress: string, options: { owner?: string }) => {
       const opts = program.opts() as TokenBalanceOptions;
@@ -199,8 +199,8 @@ export function registerCommands(program: Command): void {
   // Top-level: sign
   program
     .command("sign <base64-tx>")
-    .description("Sign a base64-encoded transaction")
-    .option("--send", "Send the signed transaction", false)
+    .description("Sign a base64-encoded transaction (supports legacy and versioned transactions)")
+    .option("--send", "Sign and broadcast the transaction on-chain", false)
     .action(async (base64Tx: string, options: { send?: boolean }) => {
       const opts = program.opts() as GlobalOptions;
       try {

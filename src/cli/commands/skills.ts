@@ -281,7 +281,7 @@ async function handleSkillsDelete(name: string, options: GlobalOptions & { yes?:
 export function registerSkillsCommands(program: Command): void {
   const skills = program
     .command("skills")
-    .description("Skills hub commands");
+    .description("On-chain skill registry — register, publish, install, and manage AI agent skills");
 
   // skills register
   skills

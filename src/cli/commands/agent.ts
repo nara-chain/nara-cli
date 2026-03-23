@@ -304,13 +304,13 @@ async function handleAgentClear(options: GlobalOptions) {
 export function registerAgentCommands(program: Command): void {
   const agent = program
     .command("agent")
-    .description("Agent Registry commands (on-chain AI agents)");
+    .description("Agent Registry — register an on-chain AI agent identity to earn extra rewards and points from PoMI mining");
 
   // agent register
   agent
     .command("register <agent-id>")
-    .description("Register a new agent on-chain")
-    .option("--referral <agent-id>", "Referral agent ID")
+    .description("Register a new agent on-chain (costs 1 NARA, 50% off with referral). Agent ID must be lowercase alphanumeric with hyphens.")
+    .option("--referral <agent-id>", "Referral agent ID — saves 50% on registration fee")
     .action(async (agentId: string, opts: { referral?: string }, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;

@@ -400,12 +400,12 @@ function handleSubmitError(err: any) {
 export function registerQuestCommands(program: Command): void {
   const quest = program
     .command("quest")
-    .description("Quest commands");
+    .description("PoMI quest commands — mine NARA by answering on-chain quests with ZK proofs");
 
   // quest get
   quest
     .command("get")
-    .description("Get current quest info")
+    .description("Get current quest info (question, deadline, difficulty, stake requirement)")
     .action(async (_opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
@@ -419,12 +419,12 @@ export function registerQuestCommands(program: Command): void {
   // quest answer
   quest
     .command("answer <answer>")
-    .description("Submit an answer")
-    .option("--relay [url]", `Submit via relay service, gasless (default: ${DEFAULT_QUEST_RELAY_URL})`)
-    .option("--agent <name>", "Agent identifier (default: naracli)")
-    .option("--model <name>", "Model identifier")
-    .option("--referral <agent-id>", "Referral agent ID")
-    .option("--stake [amount]", 'Stake NARA before answering ("auto" to top-up to requirement, or a number)')
+    .description("Submit a quest answer with ZK proof. Generates a proof locally and submits on-chain. Use --relay when balance is 0 (gasless). Always pass --agent and --model for reward tracking.")
+    .option("--relay [url]", `Submit via gasless relay (default: ${DEFAULT_QUEST_RELAY_URL}, backup: https://quest2-api.nara.build/)`)
+    .option("--agent <name>", "Agent/platform type: claude-code, cursor, chatgpt, openclaw, etc. (default: naracli)")
+    .option("--model <name>", "AI model used: claude-opus-4-6, claude-sonnet-4-6, gpt-4o, etc.")
+    .option("--referral <agent-id>", "Referral agent ID for earning referral points")
+    .option("--stake [amount]", 'Stake NARA in the same tx ("auto" to top-up to requirement, or an exact amount)')
     .action(async (answer: string, opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;

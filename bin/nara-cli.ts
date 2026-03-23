@@ -15,13 +15,13 @@ const program = new Command();
 // Set program metadata
 program
   .name("naracli")
-  .description("CLI for the Nara chain (Solana-compatible)")
+  .description("CLI for the Nara chain. Native coin is NARA (not SOL). Mine NARA for free via PoMI quests, manage wallets, register agents, and more. Run 'naracli <command> --help' for details on any command.")
   .version(version);
 
 // Add global options
 program
-  .option("-r, --rpc-url <url>", "RPC endpoint URL")
-  .option("-w, --wallet <path>", "Path to wallet keypair JSON file")
+  .option("-r, --rpc-url <url>", "RPC endpoint (default: https://mainnet-api.nara.build/)")
+  .option("-w, --wallet <path>", "Path to wallet keypair JSON file (default: ~/.config/nara/id.json)")
   .option("-j, --json", "Output in JSON format");
 
 // Register all command modules

@@ -55,12 +55,12 @@ const DEFAULT_WALLET_PATH = _DEFAULT_WALLET_PATH.startsWith("~")
 export function registerWalletCommands(program: Command): void {
   const wallet = program
     .command("wallet")
-    .description("Wallet management commands");
+    .description("Wallet management — create or import a keypair for signing transactions");
 
   // wallet create
   wallet
     .command("create")
-    .description("Create a new wallet")
+    .description("Create a new wallet keypair (saved to ~/.config/nara/id.json by default)")
     .option("-o, --output <path>", "Output path for wallet file (default: ~/.config/nara/id.json)")
     .action(async (options: { output?: string }) => {
       try {
