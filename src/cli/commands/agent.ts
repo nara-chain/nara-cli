@@ -433,6 +433,28 @@ export function registerAgentCommands(program: Command): void {
       }
     });
 
+  // agent myid
+  agent
+    .command("myid")
+    .description("Show your registered agent ID for the current network")
+    .action(async (_opts: any, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        const rpcUrl = getRpcUrl(globalOpts.rpcUrl);
+        const networkConfig = loadNetworkConfig(rpcUrl);
+        if (globalOpts.json) {
+          formatOutput({ agentId: networkConfig.agent_id || null }, true);
+        } else if (networkConfig.agent_id) {
+          console.log(networkConfig.agent_id);
+        } else {
+          printWarning("No agent ID registered for this network. Run 'agent register <id>' to create one.");
+        }
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
   // agent clear
   agent
     .command("clear")
