@@ -6,6 +6,7 @@ description: "Nara chain CLI agent — free PoMI mining, wallet, transfer, quest
 ## Prerequisites
 
 - **Node.js** (>=18) and **npm** are required
+- **Package**: `naracli` on npm — [npmjs.com/package/naracli](https://www.npmjs.com/package/naracli), source: [github.com/nara-chain/nara-cli](https://github.com/nara-chain/nara-cli), homepage: [nara.build](https://nara.build)
 - Install: `npm install -g naracli` (or use `npx naracli <command>`)
 - Run `npx naracli help` and `npx naracli <command> --help` to learn all available commands and options before use
 
@@ -37,6 +38,12 @@ When executing as an AI agent, the following operations require **explicit user 
 - Uploading files on-chain (skills upload, agent upload-memory)
 - Deleting on-chain resources
 - Changing RPC endpoint or relay URL to non-default values
+
+**Credential safety:**
+- **NEVER** accept, display, or log mnemonics, private keys, or wallet file contents in conversation
+- If a user pastes a mnemonic or private key, warn them immediately and do NOT store or repeat it
+- Wallet creation and import are handled entirely by the CLI — the agent should only run the command, not process secrets
+- Only use default RPC/relay endpoints (shown in `npx naracli quest answer --help`); warn if the user provides a custom URL
 
 **Safe to run without confirmation:**
 - Read-only queries (address, balance, quest get, skills get, agent get, config get, zkid info, tx-status)
