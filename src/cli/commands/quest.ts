@@ -16,6 +16,7 @@ import {
 import type { GlobalOptions } from "../types";
 import {
   getQuestInfo,
+  getQuestConfig,
   hasAnswered,
   generateProof,
   submitAnswer,
@@ -106,6 +107,17 @@ async function handleQuestGet(options: GlobalOptions) {
     return;
   }
 
+  // Stake only applies when reward slots have reached maxRewardCount
+  let stakeRequired = quest.effectiveStakeRequirement > 0;
+  try {
+    const config = await getQuestConfig(connection);
+    if (quest.rewardCount < config.maxRewardCount) {
+      stakeRequired = false;
+    }
+  } catch {
+    // If config fetch fails, fall back to showing stake as-is
+  }
+
   const data: Record<string, any> = {
     round: quest.round,
     question: quest.question,
@@ -117,7 +129,8 @@ async function handleQuestGet(options: GlobalOptions) {
     deadline: new Date(quest.deadline * 1000).toLocaleString(),
     timeRemaining: formatTimeRemaining(quest.timeRemaining),
     expired: quest.expired,
-    stakeRequirement: `${quest.effectiveStakeRequirement.toFixed(4)} NARA`,
+    stakeRequired,
+    stakeRequirement: stakeRequired ? `${quest.effectiveStakeRequirement.toFixed(4)} NARA` : "0 NARA",
     stakeHigh: `${quest.stakeHigh} NARA`,
     stakeLow: `${quest.stakeLow} NARA`,
     avgParticipantStake: `${quest.avgParticipantStake} NARA`,
@@ -135,8 +148,10 @@ async function handleQuestGet(options: GlobalOptions) {
     console.log(
       `  Reward slots: ${quest.winnerCount}/${quest.rewardCount} (${quest.remainingSlots} remaining)`
     );
-    if (quest.effectiveStakeRequirement > 0) {
+    if (stakeRequired) {
       console.log(`  Stake requirement: ${quest.effectiveStakeRequirement.toFixed(4)} NARA (decays ${quest.stakeHigh} → ${quest.stakeLow})`);
+    } else {
+      console.log(`  Stake requirement: none`);
     }
     console.log(`  Deadline: ${new Date(quest.deadline * 1000).toLocaleString()}`);
     if (quest.timeRemaining > 0) {
@@ -144,6 +159,55 @@ async function handleQuestGet(options: GlobalOptions) {
     } else {
       printWarning("Quest has expired");
     }
+    console.log("");
+  }
+}
+
+// ─── Command: quest config ───────────────────────────────────────
+async function handleQuestConfig(options: GlobalOptions) {
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const connection = new Connection(rpcUrl, "confirmed");
+
+  let config;
+  try {
+    config = await getQuestConfig(connection);
+  } catch (err: any) {
+    printError(`Failed to fetch quest config: ${err.message}`);
+    process.exit(1);
+  }
+
+  const DECIMALS = 1e9;
+  const rewardPerShare = config.rewardPerShare / DECIMALS;
+  const extraReward = config.extraReward / DECIMALS;
+  const stakeBpsHigh = config.stakeBpsHigh;
+  const stakeBpsLow = config.stakeBpsLow;
+
+  const data = {
+    authority: config.authority.toBase58(),
+    questAuthority: config.questAuthority.toBase58(),
+    treasury: config.treasury.toBase58(),
+    minRewardCount: config.minRewardCount,
+    maxRewardCount: config.maxRewardCount,
+    rewardPerShare,
+    extraReward,
+    stakeBpsHigh,
+    stakeBpsLow,
+    decayMs: config.decayMs,
+    minQuestInterval: config.minQuestInterval,
+  };
+
+  if (options.json) {
+    formatOutput(data, true);
+  } else {
+    console.log("");
+    console.log(`  Min Reward Count:   ${data.minRewardCount}`);
+    console.log(`  Max Reward Count:   ${data.maxRewardCount}`);
+    console.log(`  Reward Per Share:   ${rewardPerShare} NARA`);
+    console.log(`  Extra Reward:       ${extraReward} NARA`);
+    console.log(`  Stake BPS High:     ${stakeBpsHigh / 100}%`);
+    console.log(`  Stake BPS Low:      ${stakeBpsLow / 100}%`);
+    console.log(`  Decay (ms):         ${data.decayMs}`);
+    console.log(`  Min Quest Interval: ${data.minQuestInterval}s`);
     console.log("");
   }
 }
@@ -431,6 +495,20 @@ export function registerQuestCommands(program: Command): void {
         const relayUrl = opts.relay === true ? DEFAULT_QUEST_RELAY_URL : opts.relay;
         const stakeVal = opts.stake === true ? "auto" : opts.stake;
         await handleQuestAnswer(answer, { ...globalOpts, relay: relayUrl, agent: opts.agent, model: opts.model, referral: opts.referral, stake: stakeVal });
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // quest config
+  quest
+    .command("config")
+    .description("Show quest program config (reward counts, stake params, decay, intervals)")
+    .action(async (_opts: any, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleQuestConfig(globalOpts);
       } catch (error: any) {
         printError(error.message);
         process.exit(1);
