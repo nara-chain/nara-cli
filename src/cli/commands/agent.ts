@@ -27,6 +27,12 @@ import {
   logActivity,
   logActivityWithReferral,
   setReferral as setReferralOnChain,
+  getAgentTwitter,
+  setTwitter,
+  submitTweet,
+  unbindTwitter,
+  getTweetVerify,
+  getAgentRegistryConfig,
 } from "nara-sdk";
 import { readFileSync } from "node:fs";
 import { loadNetworkConfig, setAgentId, clearAgentId } from "../utils/agent-config";
@@ -299,6 +305,190 @@ async function handleAgentClear(options: GlobalOptions) {
   }
 }
 
+// ─── Twitter handlers ────────────────────────────────────────────
+
+const TWITTER_STATUS: Record<number, string> = { 0: "none", 1: "pending", 2: "verified", 3: "rejected" };
+
+async function handleAgentTwitterGet(agentId: string, options: GlobalOptions) {
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const connection = new Connection(rpcUrl, "confirmed");
+
+  const info = await getAgentTwitter(connection, agentId);
+  if (!info) {
+    if (options.json) {
+      formatOutput({ agentId, twitter: null }, true);
+    } else {
+      printWarning(`Agent "${agentId}" has no twitter binding`);
+    }
+    return;
+  }
+
+  const data = {
+    agentId,
+    username: info.username,
+    tweetUrl: info.tweetUrl,
+    status: TWITTER_STATUS[info.status] ?? `unknown(${info.status})`,
+    verifiedAt: info.verifiedAt ? new Date(info.verifiedAt * 1000).toISOString() : null,
+  };
+
+  if (options.json) {
+    formatOutput(data, true);
+  } else {
+    console.log("");
+    console.log(`  Agent ID: ${data.agentId}`);
+    console.log(`  Twitter:  @${data.username}`);
+    console.log(`  Tweet:    ${data.tweetUrl}`);
+    console.log(`  Status:   ${data.status}`);
+    if (data.verifiedAt) console.log(`  Verified: ${data.verifiedAt}`);
+    console.log("");
+  }
+}
+
+async function handleAgentTwitterSet(agentId: string, username: string, tweetUrl: string, options: GlobalOptions) {
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const connection = new Connection(rpcUrl, "confirmed");
+  const wallet = await loadWallet(options.wallet);
+
+  if (!options.json) printInfo(`Binding @${username} to agent "${agentId}"...`);
+  const signature = await setTwitter(connection, wallet, agentId, username, tweetUrl);
+  if (!options.json) printSuccess(`Twitter @${username} submitted for verification!`);
+
+  if (options.json) {
+    formatOutput({ agentId, username, tweetUrl, signature }, true);
+  } else {
+    console.log(`  Transaction: ${signature}`);
+  }
+}
+
+async function handleAgentTwitterUnbind(agentId: string, username: string, options: GlobalOptions) {
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const connection = new Connection(rpcUrl, "confirmed");
+  const wallet = await loadWallet(options.wallet);
+
+  if (!options.json) printInfo(`Unbinding @${username} from agent "${agentId}"...`);
+  const signature = await unbindTwitter(connection, wallet, agentId, username);
+  if (!options.json) printSuccess(`Twitter @${username} unbound!`);
+
+  if (options.json) {
+    formatOutput({ agentId, username, signature }, true);
+  } else {
+    console.log(`  Transaction: ${signature}`);
+  }
+}
+
+async function handleAgentSubmitTweet(agentId: string, username: string, tweetUrl: string, options: GlobalOptions) {
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const connection = new Connection(rpcUrl, "confirmed");
+  const wallet = await loadWallet(options.wallet);
+
+  if (!options.json) printInfo(`Submitting tweet for verification...`);
+  const signature = await submitTweet(connection, wallet, agentId, username, tweetUrl);
+  if (!options.json) printSuccess(`Tweet submitted for verification!`);
+
+  if (options.json) {
+    formatOutput({ agentId, username, tweetUrl, signature }, true);
+  } else {
+    console.log(`  Transaction: ${signature}`);
+  }
+}
+
+async function handleAgentTweetStatus(agentId: string, options: GlobalOptions) {
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const connection = new Connection(rpcUrl, "confirmed");
+
+  const info = await getTweetVerify(connection, agentId);
+  if (!info) {
+    if (options.json) {
+      formatOutput({ agentId, tweetVerify: null }, true);
+    } else {
+      printWarning(`Agent "${agentId}" has no tweet verification record`);
+    }
+    return;
+  }
+
+  const data = {
+    agentId,
+    tweetUrl: info.tweetUrl,
+    status: TWITTER_STATUS[info.status] ?? `unknown(${info.status})`,
+    submittedAt: info.submittedAt ? new Date(info.submittedAt * 1000).toISOString() : null,
+    lastRewardedAt: info.lastRewardedAt ? new Date(info.lastRewardedAt * 1000).toISOString() : null,
+  };
+
+  if (options.json) {
+    formatOutput(data, true);
+  } else {
+    console.log("");
+    console.log(`  Agent ID:      ${data.agentId}`);
+    console.log(`  Tweet:         ${data.tweetUrl}`);
+    console.log(`  Status:        ${data.status}`);
+    if (data.submittedAt) console.log(`  Submitted:     ${data.submittedAt}`);
+    if (data.lastRewardedAt) console.log(`  Last rewarded: ${data.lastRewardedAt}`);
+    console.log("");
+  }
+}
+
+async function handleAgentConfig(options: GlobalOptions) {
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const connection = new Connection(rpcUrl, "confirmed");
+  const DECIMALS = 1_000_000_000;
+
+  const config = await getAgentRegistryConfig(connection);
+
+  const data = {
+    registerFee: config.registerFee / DECIMALS,
+    referralRegisterFee: config.referralRegisterFee / DECIMALS,
+    referralFeeShare: config.referralFeeShare / DECIMALS,
+    activityReward: config.activityReward / DECIMALS,
+    referralActivityReward: config.referralActivityReward / DECIMALS,
+    pointsSelf: config.pointsSelf,
+    pointsReferral: config.pointsReferral,
+    referralRegisterPoints: config.referralRegisterPoints,
+    twitterVerificationFee: config.twitterVerificationFee / DECIMALS,
+    twitterVerificationReward: config.twitterVerificationReward / DECIMALS,
+    twitterVerificationPoints: config.twitterVerificationPoints,
+    tweetVerifyReward: config.tweetVerifyReward / DECIMALS,
+    tweetVerifyPoints: config.tweetVerifyPoints,
+  };
+
+  if (options.json) {
+    formatOutput(data, true);
+  } else {
+    console.log("");
+    console.log(`  Register Fee:              ${data.registerFee} NARA`);
+    console.log(`  Referral Register Fee:     ${data.referralRegisterFee} NARA`);
+    console.log(`  Referral Fee Share:        ${data.referralFeeShare} NARA`);
+    console.log(`  Activity Reward:           ${data.activityReward} NARA`);
+    console.log(`  Referral Activity Reward:  ${data.referralActivityReward} NARA`);
+    console.log(`  Points (self):             ${data.pointsSelf}`);
+    console.log(`  Points (referral):         ${data.pointsReferral}`);
+    console.log(`  Referral Register Points:  ${data.referralRegisterPoints}`);
+    console.log(`  Twitter Verify Fee:        ${data.twitterVerificationFee} NARA`);
+    console.log(`  Twitter Verify Reward:     ${data.twitterVerificationReward} NARA`);
+    console.log(`  Twitter Verify Points:     ${data.twitterVerificationPoints}`);
+    console.log(`  Tweet Verify Reward:       ${data.tweetVerifyReward} NARA`);
+    console.log(`  Tweet Verify Points:       ${data.tweetVerifyPoints}`);
+    console.log("");
+  }
+}
+
+async function handleAgentMyId(options: GlobalOptions) {
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const networkConfig = loadNetworkConfig(rpcUrl);
+  if (!networkConfig.agent_id) {
+    if (options.json) {
+      formatOutput({ agentId: null }, true);
+    } else {
+      printWarning("No agent ID registered for this network. Use 'agent register <id>' to register one.");
+    }
+    return;
+  }
+  if (options.json) {
+    formatOutput({ agentId: networkConfig.agent_id }, true);
+  } else {
+    console.log(networkConfig.agent_id);
+  }
+}
+
 // ─── Register commands ───────────────────────────────────────────
 
 export function registerAgentCommands(program: Command): void {
@@ -455,6 +645,20 @@ export function registerAgentCommands(program: Command): void {
       }
     });
 
+  // agent config
+  agent
+    .command("config")
+    .description("Show agent registry on-chain config (fees, rewards, points)")
+    .action(async (_opts: any, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleAgentConfig(globalOpts);
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
   // agent clear
   agent
     .command("clear")
@@ -493,6 +697,78 @@ export function registerAgentCommands(program: Command): void {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
         await handleAgentLog(agentId, activity, log, { ...globalOpts, ...opts });
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // ─── Twitter commands ───────────────────────────────────────────
+
+  // agent twitter <agent-id>
+  agent
+    .command("twitter <agent-id>")
+    .description("Get agent's twitter binding status")
+    .action(async (agentId: string, _opts: any, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleAgentTwitterGet(agentId, globalOpts);
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // agent set-twitter <agent-id> <username> <tweet-url>
+  agent
+    .command("set-twitter <agent-id> <username> <tweet-url>")
+    .description("Bind a twitter account to your agent (charges verification fee). Tweet must contain your agent ID.")
+    .action(async (agentId: string, username: string, tweetUrl: string, _opts: any, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleAgentTwitterSet(agentId, username, tweetUrl, globalOpts);
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // agent unbind-twitter <agent-id> <username>
+  agent
+    .command("unbind-twitter <agent-id> <username>")
+    .description("Unbind twitter from your agent")
+    .action(async (agentId: string, username: string, _opts: any, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleAgentTwitterUnbind(agentId, username, globalOpts);
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // agent submit-tweet <agent-id> <username> <tweet-url>
+  agent
+    .command("submit-tweet <agent-id> <username> <tweet-url>")
+    .description("Submit a tweet for verification and earn rewards (charges verification fee)")
+    .action(async (agentId: string, username: string, tweetUrl: string, _opts: any, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleAgentSubmitTweet(agentId, username, tweetUrl, globalOpts);
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // agent tweet-status <agent-id>
+  agent
+    .command("tweet-status <agent-id>")
+    .description("Check tweet verification status")
+    .action(async (agentId: string, _opts: any, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleAgentTweetStatus(agentId, globalOpts);
       } catch (error: any) {
         printError(error.message);
         process.exit(1);
