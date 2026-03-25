@@ -130,7 +130,7 @@ async function handleQuestGet(options: GlobalOptions) {
     timeRemaining: formatTimeRemaining(quest.timeRemaining),
     expired: quest.expired,
     stakeRequired,
-    stakeRequirement: stakeRequired ? `${quest.effectiveStakeRequirement.toFixed(4)} NARA` : "0 NARA",
+    stakeRequirement: stakeRequired ? `${quest.effectiveStakeRequirement.toFixed(9).replace(/\.?0+$/, "")} NARA` : "0 NARA",
     stakeHigh: `${quest.stakeHigh} NARA`,
     stakeLow: `${quest.stakeLow} NARA`,
     avgParticipantStake: `${quest.avgParticipantStake} NARA`,
@@ -149,7 +149,7 @@ async function handleQuestGet(options: GlobalOptions) {
       `  Reward slots: ${quest.winnerCount}/${quest.rewardCount} (${quest.remainingSlots} remaining)`
     );
     if (stakeRequired) {
-      console.log(`  Stake requirement: ${quest.effectiveStakeRequirement.toFixed(4)} NARA (decays ${quest.stakeHigh} → ${quest.stakeLow})`);
+      console.log(`  Stake requirement: ${quest.effectiveStakeRequirement.toFixed(9).replace(/\.?0+$/, "")} NARA (decays ${quest.stakeHigh} → ${quest.stakeLow})`);
     } else {
       console.log(`  Stake requirement: none`);
     }
