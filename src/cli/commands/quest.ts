@@ -202,10 +202,10 @@ async function handleQuestConfig(options: GlobalOptions) {
     console.log("");
     console.log(`  Min Reward Count:   ${data.minRewardCount}`);
     console.log(`  Max Reward Count:   ${data.maxRewardCount}`);
-    console.log(`  Reward Per Share:   ${rewardPerShare} NARA`);
-    console.log(`  Extra Reward:       ${extraReward} NARA`);
-    console.log(`  Stake BPS High:     ${stakeBpsHigh / 100}%`);
-    console.log(`  Stake BPS Low:      ${stakeBpsLow / 100}%`);
+    console.log(`  Reward Per Share:   ${rewardPerShare} NARA (${config.rewardPerShare} lamports)`);
+    console.log(`  Extra Reward:       ${extraReward} NARA (${config.extraReward} lamports)`);
+    console.log(`  Stake BPS High:     ${stakeBpsHigh / 100}% (${stakeBpsHigh} BPS)`);
+    console.log(`  Stake BPS Low:      ${stakeBpsLow / 100}% (${stakeBpsLow} BPS)`);
     console.log(`  Decay (ms):         ${data.decayMs}`);
     console.log(`  Min Quest Interval: ${data.minQuestInterval}s`);
     console.log("");

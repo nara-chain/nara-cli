@@ -454,18 +454,18 @@ async function handleAgentConfig(options: GlobalOptions) {
     formatOutput(data, true);
   } else {
     console.log("");
-    console.log(`  Register Fee:              ${data.registerFee} NARA`);
-    console.log(`  Referral Register Fee:     ${data.referralRegisterFee} NARA`);
-    console.log(`  Referral Fee Share:        ${data.referralFeeShare} NARA`);
-    console.log(`  Activity Reward:           ${data.activityReward} NARA`);
-    console.log(`  Referral Activity Reward:  ${data.referralActivityReward} NARA`);
+    console.log(`  Register Fee:              ${data.registerFee} NARA (${config.registerFee} lamports)`);
+    console.log(`  Referral Register Fee:     ${data.referralRegisterFee} NARA (${config.referralRegisterFee} lamports)`);
+    console.log(`  Referral Fee Share:        ${data.referralFeeShare} NARA (${config.referralFeeShare} lamports)`);
+    console.log(`  Activity Reward:           ${data.activityReward} NARA (${config.activityReward} lamports)`);
+    console.log(`  Referral Activity Reward:  ${data.referralActivityReward} NARA (${config.referralActivityReward} lamports)`);
     console.log(`  Points (self):             ${data.pointsSelf}`);
     console.log(`  Points (referral):         ${data.pointsReferral}`);
     console.log(`  Referral Register Points:  ${data.referralRegisterPoints}`);
-    console.log(`  Twitter Verify Fee:        ${data.twitterVerificationFee} NARA`);
-    console.log(`  Twitter Verify Reward:     ${data.twitterVerificationReward} NARA`);
+    console.log(`  Twitter Verify Fee:        ${data.twitterVerificationFee} NARA (${config.twitterVerificationFee} lamports)`);
+    console.log(`  Twitter Verify Reward:     ${data.twitterVerificationReward} NARA (${config.twitterVerificationReward} lamports)`);
     console.log(`  Twitter Verify Points:     ${data.twitterVerificationPoints}`);
-    console.log(`  Tweet Verify Reward:       ${data.tweetVerifyReward} NARA`);
+    console.log(`  Tweet Verify Reward:       ${data.tweetVerifyReward} NARA (${config.tweetVerifyReward} lamports)`);
     console.log(`  Tweet Verify Points:       ${data.tweetVerifyPoints}`);
     console.log("");
   }
