@@ -118,6 +118,17 @@ async function handleQuestGet(options: GlobalOptions) {
     // If config fetch fails, fall back to showing stake as-is
   }
 
+  // Fetch free credits (stake-free answer quota)
+  let freeCredits = 0;
+  try {
+    const stakeInfo = await getStakeInfo(connection, wallet.publicKey);
+    if (stakeInfo) {
+      freeCredits = stakeInfo.freeCredits;
+    }
+  } catch {
+    // Ignore — wallet may not have a stake record
+  }
+
   const data: Record<string, any> = {
     round: quest.round,
     question: quest.question,
@@ -134,6 +145,7 @@ async function handleQuestGet(options: GlobalOptions) {
     stakeHigh: `${quest.stakeHigh} NARA`,
     stakeLow: `${quest.stakeLow} NARA`,
     avgParticipantStake: `${quest.avgParticipantStake} NARA`,
+    freeCredits,
   };
 
   if (options.json) {
@@ -153,6 +165,7 @@ async function handleQuestGet(options: GlobalOptions) {
     } else {
       console.log(`  Stake requirement: none`);
     }
+    console.log(`  Stake-free credits: ${freeCredits}`);
     console.log(`  Deadline: ${new Date(quest.deadline * 1000).toLocaleString()}`);
     if (quest.timeRemaining > 0) {
       console.log(`  Time remaining: ${formatTimeRemaining(quest.timeRemaining)}`);
