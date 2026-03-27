@@ -13,7 +13,8 @@
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { DEFAULT_RPC_URL } from "nara-sdk";
+import { Connection } from "@solana/web3.js";
+import { DEFAULT_RPC_URL, getAgentInfo } from "nara-sdk";
 
 const CONFIG_DIR = join(homedir(), ".config", "nara");
 const GLOBAL_CONFIG_PATH = join(CONFIG_DIR, "config.json");
@@ -76,47 +77,112 @@ export interface NetworkConfig {
 
 const DEFAULT_NETWORK_CONFIG: NetworkConfig = { agent_id: "", zk_ids: [] };
 
-/**
- * Load network-specific config.
- * @param rpcUrl - effective RPC URL (determines which file to load)
- */
-export function loadNetworkConfig(rpcUrl?: string): NetworkConfig {
+/** Read raw JSON from network config file. */
+function loadRawNetworkConfig(rpcUrl?: string): Record<string, any> {
   const url = rpcUrl || getConfiguredRpcUrl();
   const path = networkConfigPath(url);
   try {
-    const raw = readFileSync(path, "utf-8");
-    const parsed = JSON.parse(raw);
-    return {
-      agent_id: typeof parsed.agent_id === "string" ? parsed.agent_id : "",
-      zk_ids: Array.isArray(parsed.zk_ids) ? parsed.zk_ids : [],
-    };
+    return JSON.parse(readFileSync(path, "utf-8"));
   } catch {
-    return { ...DEFAULT_NETWORK_CONFIG };
+    return {};
   }
+}
+
+/** Write raw JSON to network config file. */
+function saveRawNetworkConfig(data: Record<string, any>, rpcUrl?: string): void {
+  const url = rpcUrl || getConfiguredRpcUrl();
+  const path = networkConfigPath(url);
+  mkdirSync(CONFIG_DIR, { recursive: true });
+  writeFileSync(path, JSON.stringify(data, null, 2) + "\n");
+}
+
+/**
+ * Load network-specific config.
+ * @param rpcUrl - effective RPC URL (determines which file to load)
+ * @param walletPubkey - wallet public key to look up agent_id (optional)
+ */
+export function loadNetworkConfig(rpcUrl?: string, walletPubkey?: string): NetworkConfig {
+  const raw = loadRawNetworkConfig(rpcUrl);
+
+  // Resolve agent_id: new format uses wallet pubkey as key
+  let agent_id = "";
+  if (walletPubkey && typeof raw[walletPubkey] === "string") {
+    agent_id = raw[walletPubkey];
+  } else if (typeof raw.agent_id === "string" && raw.agent_id) {
+    // Legacy format: { "agent_id": "xxx" } — return value but don't migrate here
+    // Call migrateAgentIdFormat() to migrate with on-chain authority check
+    agent_id = raw.agent_id;
+  } else if (!walletPubkey) {
+    // No wallet provided — find first agent_id from any key (best-effort)
+    for (const [k, v] of Object.entries(raw)) {
+      if (k !== "zk_ids" && typeof v === "string" && v) {
+        agent_id = v;
+        break;
+      }
+    }
+  }
+
+  return {
+    agent_id,
+    zk_ids: Array.isArray(raw.zk_ids) ? raw.zk_ids : [],
+  };
 }
 
 /**
  * Save network-specific config.
  */
 export function saveNetworkConfig(config: NetworkConfig, rpcUrl?: string): void {
-  const url = rpcUrl || getConfiguredRpcUrl();
-  const path = networkConfigPath(url);
-  mkdirSync(CONFIG_DIR, { recursive: true });
-  writeFileSync(path, JSON.stringify(config, null, 2) + "\n");
+  const raw = loadRawNetworkConfig(rpcUrl);
+  // Preserve existing wallet->agentId mappings, update zk_ids
+  raw.zk_ids = config.zk_ids;
+  saveRawNetworkConfig(raw, rpcUrl);
 }
 
 // ─── Convenience helpers ─────────────────────────────────────────
 
-export function setAgentId(id: string, rpcUrl?: string): void {
-  const config = loadNetworkConfig(rpcUrl);
-  config.agent_id = id;
-  saveNetworkConfig(config, rpcUrl);
+export function setAgentId(id: string, rpcUrl?: string, walletPubkey?: string): void {
+  const raw = loadRawNetworkConfig(rpcUrl);
+  if (walletPubkey) {
+    raw[walletPubkey] = id;
+    // Clean up legacy field if present
+    delete raw.agent_id;
+  } else {
+    raw.agent_id = id;
+  }
+  saveRawNetworkConfig(raw, rpcUrl);
 }
 
-export function clearAgentId(rpcUrl?: string): void {
-  const config = loadNetworkConfig(rpcUrl);
-  config.agent_id = "";
-  saveNetworkConfig(config, rpcUrl);
+export function clearAgentId(rpcUrl?: string, walletPubkey?: string): void {
+  const raw = loadRawNetworkConfig(rpcUrl);
+  if (walletPubkey) {
+    delete raw[walletPubkey];
+  }
+  // Also clean up legacy field
+  delete raw.agent_id;
+  saveRawNetworkConfig(raw, rpcUrl);
+}
+
+/**
+ * Migrate legacy { "agent_id": "xxx" } to { "<authority-pubkey>": "xxx" }.
+ * Queries on-chain agent info to determine the authority.
+ * No-op if no legacy agent_id field exists.
+ */
+export async function migrateAgentIdFormat(rpcUrl?: string): Promise<void> {
+  const url = rpcUrl || getConfiguredRpcUrl();
+  const raw = loadRawNetworkConfig(url);
+  if (typeof raw.agent_id !== "string" || !raw.agent_id) return;
+
+  const agentId = raw.agent_id;
+  try {
+    const connection = new Connection(url, "confirmed");
+    const info = await getAgentInfo(connection, agentId);
+    const authority = info.record.authority.toBase58();
+    raw[authority] = agentId;
+    delete raw.agent_id;
+    saveRawNetworkConfig(raw, url);
+  } catch {
+    // Agent not found on-chain or RPC error — keep legacy format for now
+  }
 }
 
 export function addZkId(name: string, rpcUrl?: string): void {

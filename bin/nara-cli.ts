@@ -4,6 +4,7 @@
 
 import { Command } from "commander";
 import { registerCommands } from "../src/cli/index";
+import { migrateAgentIdFormat } from "../src/cli/utils/agent-config";
 // __CLI_VERSION__ is injected by the build script via esbuild --define.
 // In dev mode (tsx), fall back to "dev".
 declare const __CLI_VERSION__: string;
@@ -33,5 +34,5 @@ if (!process.argv.slice(2).length) {
   process.exit(0);
 }
 
-// Parse arguments and execute
-program.parse(process.argv);
+// Migrate legacy agent_id format, then parse
+migrateAgentIdFormat().catch(() => {}).then(() => program.parse(process.argv));

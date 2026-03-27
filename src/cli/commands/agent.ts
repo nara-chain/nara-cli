@@ -32,34 +32,61 @@ import {
   submitTweet,
   unbindTwitter,
   getTweetVerify,
+  getTweetRecord,
   getAgentRegistryConfig,
 } from "nara-sdk";
 import { readFileSync } from "node:fs";
 import { loadNetworkConfig, setAgentId, clearAgentId } from "../utils/agent-config";
 import { validateName } from "../utils/validation";
 
+// ─── Helpers ─────────────────────────────────────────────────────
+
+/** Try to get wallet pubkey without failing. */
+async function tryGetWalletPubkey(walletPath?: string): Promise<string | undefined> {
+  try {
+    const wallet = await loadWallet(walletPath);
+    return wallet.publicKey.toBase58();
+  } catch {
+    return undefined;
+  }
+}
+
+/** Resolve agent ID: use explicit --agent-id option, or fall back to saved myid. */
+async function resolveAgentId(options: GlobalOptions & { agentId?: string }): Promise<string> {
+  if (options.agentId) return options.agentId;
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const pubkey = await tryGetWalletPubkey(options.wallet);
+  const networkConfig = loadNetworkConfig(rpcUrl, pubkey);
+  if (!networkConfig.agent_id) {
+    printError('No agent ID specified. Use --agent-id or run "agent register <id>" first.');
+    process.exit(1);
+  }
+  return networkConfig.agent_id;
+}
+
 // ─── Command handlers ────────────────────────────────────────────
 
 async function handleAgentRegister(agentId: string, options: GlobalOptions & { referral?: string }) {
   validateName(agentId, "Agent ID");
   const rpcUrl = getRpcUrl(options.rpcUrl);
+  const wallet = await loadWallet(options.wallet);
+  const pubkey = wallet.publicKey.toBase58();
 
-  // Check if an agent ID is already configured for this network
-  const networkConfig = loadNetworkConfig(rpcUrl);
+  // Check if an agent ID is already configured for this wallet
+  const networkConfig = loadNetworkConfig(rpcUrl, pubkey);
   if (networkConfig.agent_id) {
-    printError(`Agent ID "${networkConfig.agent_id}" is already configured for this network. Run "agent clear" first to unlink it.`);
+    printError(`Agent ID "${networkConfig.agent_id}" is already configured for this wallet. Run "agent clear" first to unlink it.`);
     process.exit(1);
   }
 
   const connection = new Connection(rpcUrl, "confirmed");
-  const wallet = await loadWallet(options.wallet);
 
   if (!options.json) printInfo(`Registering agent "${agentId}"...`);
   const result = options.referral
     ? await registerAgentWithReferral(connection, wallet, agentId, options.referral)
     : await registerAgent(connection, wallet, agentId);
   if (!options.json) printSuccess(`Agent "${agentId}" registered!`);
-  setAgentId(agentId, rpcUrl);
+  setAgentId(agentId, rpcUrl, pubkey);
 
   if (options.json) {
     formatOutput({ agentId, referral: options.referral ?? null, signature: result.signature, agentPubkey: result.agentPubkey.toBase58() }, true);
@@ -76,7 +103,39 @@ async function handleAgentGet(agentId: string, options: GlobalOptions) {
 
   const info = await getAgentInfo(connection, agentId);
 
-  const data = {
+  // Fetch twitter binding info
+  let twitterData: { username: string; tweetUrl: string; status: string; verifiedAt: string | null } | null = null;
+  try {
+    const tw = await getAgentTwitter(connection, agentId);
+    if (tw) {
+      twitterData = {
+        username: tw.username,
+        tweetUrl: tw.tweetUrl,
+        status: TWITTER_STATUS[tw.status] ?? `unknown(${tw.status})`,
+        verifiedAt: tw.verifiedAt ? new Date(tw.verifiedAt * 1000).toISOString() : null,
+      };
+    }
+  } catch {
+    // Ignore — twitter binding may not exist
+  }
+
+  // Fetch tweet verification info
+  let tweetVerifyData: { tweetId: string; status: string; submittedAt: string | null; lastRewardedAt: string | null } | null = null;
+  try {
+    const tv = await getTweetVerify(connection, agentId);
+    if (tv) {
+      tweetVerifyData = {
+        tweetId: tv.tweetId.toString(),
+        status: TWITTER_STATUS[tv.status] ?? `unknown(${tv.status})`,
+        submittedAt: tv.submittedAt ? new Date(tv.submittedAt * 1000).toISOString() : null,
+        lastRewardedAt: tv.lastRewardedAt ? new Date(tv.lastRewardedAt * 1000).toISOString() : null,
+      };
+    }
+  } catch {
+    // Ignore
+  }
+
+  const data: Record<string, any> = {
     agentId: info.record.agentId,
     authority: info.record.authority.toBase58(),
     version: info.record.version,
@@ -84,6 +143,8 @@ async function handleAgentGet(agentId: string, options: GlobalOptions) {
     metadata: info.metadata,
     createdAt: new Date(info.record.createdAt * 1000).toISOString(),
     updatedAt: info.record.updatedAt ? new Date(info.record.updatedAt * 1000).toISOString() : null,
+    twitter: twitterData,
+    tweetVerify: tweetVerifyData,
   };
 
   if (options.json) {
@@ -97,7 +158,46 @@ async function handleAgentGet(agentId: string, options: GlobalOptions) {
     console.log(`  Metadata: ${data.metadata ?? "(none)"}`);
     console.log(`  Created: ${data.createdAt}`);
     if (data.updatedAt) console.log(`  Updated: ${data.updatedAt}`);
+    // Twitter binding
+    if (twitterData) {
+      console.log(`  Twitter: @${twitterData.username} (${twitterData.status})`);
+      if (twitterData.verifiedAt) console.log(`  Twitter verified: ${twitterData.verifiedAt}`);
+    } else {
+      console.log(`  Twitter: (none)`);
+    }
+    // Tweet verification
+    if (tweetVerifyData) {
+      console.log(`  Tweet verify: ${tweetVerifyData.tweetId} (${tweetVerifyData.status})`);
+      if (tweetVerifyData.lastRewardedAt) console.log(`  Tweet last rewarded: ${tweetVerifyData.lastRewardedAt}`);
+    }
     console.log("");
+    if (twitterData) {
+      // Bound — show tweet submit tip
+      if (tweetVerifyData?.lastRewardedAt) {
+        const lastRewarded = new Date(tweetVerifyData.lastRewardedAt).getTime();
+        const hoursAgo = (Date.now() - lastRewarded) / (1000 * 60 * 60);
+        if (hoursAgo >= 24) {
+          console.log(`  Tip: You can verify your tweet again to earn more stake-free credits.`);
+          console.log(`     npx naracli agent submit-tweet <tweet-url>`);
+        } else {
+          const hoursLeft = Math.ceil(24 - hoursAgo);
+          console.log(`  Tip: Next tweet verification available in ~${hoursLeft}h.`);
+        }
+      } else {
+        console.log(`  Tip: Submit a tweet to earn stake-free PoMI mining credits!`);
+        console.log(`     npx naracli agent submit-tweet <tweet-url>`);
+      }
+      console.log(`  Stake-free credits are based on tweet likes, bookmarks, retweets, and quotes.`);
+      console.log("");
+    } else {
+      // Not bound — show bind tip
+      console.log(`  Tip: Bind your Twitter to get stake-free PoMI mining credits!`);
+      console.log(`  1. Post a tweet with this content:`);
+      console.log(`     I'm claiming my AI agent "${agentId}" on NaraChain @NaraBuildAI`);
+      console.log(`  2. Then run:`);
+      console.log(`     npx naracli agent bind-twitter <tweet-url>`);
+      console.log("");
+    }
   }
 }
 
@@ -287,17 +387,24 @@ async function handleAgentLog(
 
 async function handleAgentClear(options: GlobalOptions) {
   const rpcUrl = getRpcUrl(options.rpcUrl);
-  const networkConfig = loadNetworkConfig(rpcUrl);
+  let pubkey: string | undefined;
+  try {
+    const wallet = await loadWallet(options.wallet);
+    pubkey = wallet.publicKey.toBase58();
+  } catch {
+    // No wallet — clear legacy format
+  }
+  const networkConfig = loadNetworkConfig(rpcUrl, pubkey);
   if (!networkConfig.agent_id) {
     if (options.json) {
       formatOutput({ cleared: false, message: "No agent ID configured" }, true);
     } else {
-      printWarning("No agent ID configured for this network");
+      printWarning("No agent ID configured for this wallet");
     }
     return;
   }
   const oldId = networkConfig.agent_id;
-  clearAgentId(rpcUrl);
+  clearAgentId(rpcUrl, pubkey);
   if (options.json) {
     formatOutput({ cleared: true, agentId: oldId }, true);
   } else {
@@ -309,39 +416,14 @@ async function handleAgentClear(options: GlobalOptions) {
 
 const TWITTER_STATUS: Record<number, string> = { 0: "none", 1: "pending", 2: "verified", 3: "rejected" };
 
-async function handleAgentTwitterGet(agentId: string, options: GlobalOptions) {
-  const rpcUrl = getRpcUrl(options.rpcUrl);
-  const connection = new Connection(rpcUrl, "confirmed");
-
-  const info = await getAgentTwitter(connection, agentId);
-  if (!info) {
-    if (options.json) {
-      formatOutput({ agentId, twitter: null }, true);
-    } else {
-      printWarning(`Agent "${agentId}" has no twitter binding`);
-    }
-    return;
+/** Parse tweet URL and extract username + tweetId. Accepts https://x.com/<username>/status/<id> or https://twitter.com/<username>/status/<id>. */
+function parseTweetUrl(url: string): { username: string; tweetId: bigint; tweetUrl: string } {
+  const m = url.match(/^https?:\/\/(?:x\.com|twitter\.com)\/([A-Za-z0-9_]+)\/status\/(\d+)/);
+  if (!m) {
+    printError(`Invalid tweet URL. Expected format: https://x.com/<username>/status/<id>`);
+    process.exit(1);
   }
-
-  const data = {
-    agentId,
-    username: info.username,
-    tweetUrl: info.tweetUrl,
-    status: TWITTER_STATUS[info.status] ?? `unknown(${info.status})`,
-    verifiedAt: info.verifiedAt ? new Date(info.verifiedAt * 1000).toISOString() : null,
-  };
-
-  if (options.json) {
-    formatOutput(data, true);
-  } else {
-    console.log("");
-    console.log(`  Agent ID: ${data.agentId}`);
-    console.log(`  Twitter:  @${data.username}`);
-    console.log(`  Tweet:    ${data.tweetUrl}`);
-    console.log(`  Status:   ${data.status}`);
-    if (data.verifiedAt) console.log(`  Verified: ${data.verifiedAt}`);
-    console.log("");
-  }
+  return { username: m[1], tweetId: BigInt(m[2]), tweetUrl: url };
 }
 
 async function handleAgentTwitterSet(agentId: string, username: string, tweetUrl: string, options: GlobalOptions) {
@@ -376,54 +458,26 @@ async function handleAgentTwitterUnbind(agentId: string, username: string, optio
   }
 }
 
-async function handleAgentSubmitTweet(agentId: string, username: string, tweetUrl: string, options: GlobalOptions) {
+async function handleAgentSubmitTweet(agentId: string, tweetId: bigint, tweetUrl: string, options: GlobalOptions) {
   const rpcUrl = getRpcUrl(options.rpcUrl);
   const connection = new Connection(rpcUrl, "confirmed");
   const wallet = await loadWallet(options.wallet);
 
+  // Check if tweet has already been used
+  const existing = await getTweetRecord(connection, tweetId);
+  if (existing) {
+    printError(`This tweet has already been submitted and approved. Please use a different tweet.`);
+    process.exit(1);
+  }
+
   if (!options.json) printInfo(`Submitting tweet for verification...`);
-  const signature = await submitTweet(connection, wallet, agentId, username, tweetUrl);
+  const signature = await submitTweet(connection, wallet, agentId, tweetId);
   if (!options.json) printSuccess(`Tweet submitted for verification!`);
 
   if (options.json) {
-    formatOutput({ agentId, username, tweetUrl, signature }, true);
+    formatOutput({ agentId, tweetId: tweetId.toString(), tweetUrl, signature }, true);
   } else {
     console.log(`  Transaction: ${signature}`);
-  }
-}
-
-async function handleAgentTweetStatus(agentId: string, options: GlobalOptions) {
-  const rpcUrl = getRpcUrl(options.rpcUrl);
-  const connection = new Connection(rpcUrl, "confirmed");
-
-  const info = await getTweetVerify(connection, agentId);
-  if (!info) {
-    if (options.json) {
-      formatOutput({ agentId, tweetVerify: null }, true);
-    } else {
-      printWarning(`Agent "${agentId}" has no tweet verification record`);
-    }
-    return;
-  }
-
-  const data = {
-    agentId,
-    tweetUrl: info.tweetUrl,
-    status: TWITTER_STATUS[info.status] ?? `unknown(${info.status})`,
-    submittedAt: info.submittedAt ? new Date(info.submittedAt * 1000).toISOString() : null,
-    lastRewardedAt: info.lastRewardedAt ? new Date(info.lastRewardedAt * 1000).toISOString() : null,
-  };
-
-  if (options.json) {
-    formatOutput(data, true);
-  } else {
-    console.log("");
-    console.log(`  Agent ID:      ${data.agentId}`);
-    console.log(`  Tweet:         ${data.tweetUrl}`);
-    console.log(`  Status:        ${data.status}`);
-    if (data.submittedAt) console.log(`  Submitted:     ${data.submittedAt}`);
-    if (data.lastRewardedAt) console.log(`  Last rewarded: ${data.lastRewardedAt}`);
-    console.log("");
   }
 }
 
@@ -473,7 +527,8 @@ async function handleAgentConfig(options: GlobalOptions) {
 
 async function handleAgentMyId(options: GlobalOptions) {
   const rpcUrl = getRpcUrl(options.rpcUrl);
-  const networkConfig = loadNetworkConfig(rpcUrl);
+  const pubkey = await tryGetWalletPubkey(options.wallet);
+  const networkConfig = loadNetworkConfig(rpcUrl, pubkey);
   if (!networkConfig.agent_id) {
     if (options.json) {
       formatOutput({ agentId: null }, true);
@@ -513,11 +568,13 @@ export function registerAgentCommands(program: Command): void {
 
   // agent get
   agent
-    .command("get <agent-id>")
-    .description("Get agent info (bio, metadata, version)")
-    .action(async (agentId: string, _opts: any, cmd: Command) => {
+    .command("get")
+    .description("Get agent info (bio, metadata, twitter binding, tweet verification)")
+    .option("--agent-id <id>", "Agent ID (defaults to saved myid)")
+    .action(async (opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        const agentId = await resolveAgentId({ ...globalOpts, agentId: opts.agentId });
         await handleAgentGet(agentId, globalOpts);
       } catch (error: any) {
         printError(error.message);
@@ -527,11 +584,13 @@ export function registerAgentCommands(program: Command): void {
 
   // agent set-bio
   agent
-    .command("set-bio <agent-id> <bio>")
+    .command("set-bio <bio>")
     .description("Set agent bio (max 512 bytes)")
-    .action(async (agentId: string, bio: string, _opts: any, cmd: Command) => {
+    .option("--agent-id <id>", "Agent ID (defaults to saved myid)")
+    .action(async (bio: string, opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        const agentId = await resolveAgentId({ ...globalOpts, agentId: opts.agentId });
         await handleAgentSetBio(agentId, bio, globalOpts);
       } catch (error: any) {
         printError(error.message);
@@ -541,11 +600,13 @@ export function registerAgentCommands(program: Command): void {
 
   // agent set-metadata
   agent
-    .command("set-metadata <agent-id> <json>")
+    .command("set-metadata <json>")
     .description("Set agent JSON metadata (max 800 bytes)")
-    .action(async (agentId: string, jsonStr: string, _opts: any, cmd: Command) => {
+    .option("--agent-id <id>", "Agent ID (defaults to saved myid)")
+    .action(async (jsonStr: string, opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        const agentId = await resolveAgentId({ ...globalOpts, agentId: opts.agentId });
         await handleAgentSetMetadata(agentId, jsonStr, globalOpts);
       } catch (error: any) {
         printError(error.message);
@@ -555,11 +616,13 @@ export function registerAgentCommands(program: Command): void {
 
   // agent upload-memory
   agent
-    .command("upload-memory <agent-id> <file>")
+    .command("upload-memory <file>")
     .description("Upload memory data from file")
-    .action(async (agentId: string, filePath: string, _opts: any, cmd: Command) => {
+    .option("--agent-id <id>", "Agent ID (defaults to saved myid)")
+    .action(async (filePath: string, opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        const agentId = await resolveAgentId({ ...globalOpts, agentId: opts.agentId });
         await handleAgentUploadMemory(agentId, filePath, globalOpts);
       } catch (error: any) {
         printError(error.message);
@@ -569,11 +632,13 @@ export function registerAgentCommands(program: Command): void {
 
   // agent memory
   agent
-    .command("memory <agent-id>")
+    .command("memory")
     .description("Read agent memory content")
-    .action(async (agentId: string, _opts: any, cmd: Command) => {
+    .option("--agent-id <id>", "Agent ID (defaults to saved myid)")
+    .action(async (opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        const agentId = await resolveAgentId({ ...globalOpts, agentId: opts.agentId });
         await handleAgentMemory(agentId, globalOpts);
       } catch (error: any) {
         printError(error.message);
@@ -583,11 +648,13 @@ export function registerAgentCommands(program: Command): void {
 
   // agent transfer
   agent
-    .command("transfer <agent-id> <new-authority>")
+    .command("transfer <new-authority>")
     .description("Transfer agent authority to another wallet")
-    .action(async (agentId: string, newAuthority: string, _opts: any, cmd: Command) => {
+    .option("--agent-id <id>", "Agent ID (defaults to saved myid)")
+    .action(async (newAuthority: string, opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        const agentId = await resolveAgentId({ ...globalOpts, agentId: opts.agentId });
         await handleAgentTransfer(agentId, newAuthority, globalOpts);
       } catch (error: any) {
         printError(error.message);
@@ -597,11 +664,13 @@ export function registerAgentCommands(program: Command): void {
 
   // agent close-buffer
   agent
-    .command("close-buffer <agent-id>")
+    .command("close-buffer")
     .description("Close upload buffer, reclaim rent")
-    .action(async (agentId: string, _opts: any, cmd: Command) => {
+    .option("--agent-id <id>", "Agent ID (defaults to saved myid)")
+    .action(async (opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        const agentId = await resolveAgentId({ ...globalOpts, agentId: opts.agentId });
         await handleAgentCloseBuffer(agentId, globalOpts);
       } catch (error: any) {
         printError(error.message);
@@ -631,7 +700,8 @@ export function registerAgentCommands(program: Command): void {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
         const rpcUrl = getRpcUrl(globalOpts.rpcUrl);
-        const networkConfig = loadNetworkConfig(rpcUrl);
+        const pubkey = await tryGetWalletPubkey(globalOpts.wallet);
+        const networkConfig = loadNetworkConfig(rpcUrl, pubkey);
         if (globalOpts.json) {
           formatOutput({ agentId: networkConfig.agent_id || null }, true);
         } else if (networkConfig.agent_id) {
@@ -675,11 +745,13 @@ export function registerAgentCommands(program: Command): void {
 
   // agent set-referral
   agent
-    .command("set-referral <agent-id> <referral-agent-id>")
+    .command("set-referral <referral-agent-id>")
     .description("Set referral agent on-chain")
-    .action(async (agentId: string, referralAgentId: string, _opts: any, cmd: Command) => {
+    .option("--agent-id <id>", "Agent ID (defaults to saved myid)")
+    .action(async (referralAgentId: string, opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        const agentId = await resolveAgentId({ ...globalOpts, agentId: opts.agentId });
         await handleAgentSetReferral(agentId, referralAgentId, globalOpts);
       } catch (error: any) {
         printError(error.message);
@@ -689,14 +761,16 @@ export function registerAgentCommands(program: Command): void {
 
   // agent log
   agent
-    .command("log <agent-id> <activity> <log>")
+    .command("log <activity> <log>")
     .description("Log an activity event on-chain")
+    .option("--agent-id <id>", "Agent ID (defaults to saved myid)")
     .option("--model <name>", "Model identifier")
     .option("--referral <agent-id>", "Referral agent ID")
-    .action(async (agentId: string, activity: string, log: string, opts: { model?: string; referral?: string }, cmd: Command) => {
+    .action(async (activity: string, log: string, opts: { agentId?: string; model?: string; referral?: string }, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
-        await handleAgentLog(agentId, activity, log, { ...globalOpts, ...opts });
+        const agentId = await resolveAgentId({ ...globalOpts, agentId: opts.agentId });
+        await handleAgentLog(agentId, activity, log, { ...globalOpts, model: opts.model, referral: opts.referral });
       } catch (error: any) {
         printError(error.message);
         process.exit(1);
@@ -705,27 +779,55 @@ export function registerAgentCommands(program: Command): void {
 
   // ─── Twitter commands ───────────────────────────────────────────
 
-  // agent twitter <agent-id>
+  // agent bind-twitter [tweet-url]
   agent
-    .command("twitter <agent-id>")
-    .description("Get agent's twitter binding status")
-    .action(async (agentId: string, _opts: any, cmd: Command) => {
-      try {
-        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
-        await handleAgentTwitterGet(agentId, globalOpts);
-      } catch (error: any) {
-        printError(error.message);
-        process.exit(1);
-      }
-    });
+    .command("bind-twitter [tweet-url]")
+    .description("Bind twitter to your agent for stake-free PoMI credits")
+    .option("--agent-id <id>", "Agent ID (defaults to saved myid)")
+    .addHelpText("after", `
+Tweet content (replace <agent-id> with yours):
+  I'm claiming my AI agent "<agent-id>" on NaraChain @NaraBuildAI
 
-  // agent set-twitter <agent-id> <username> <tweet-url>
-  agent
-    .command("set-twitter <agent-id> <username> <tweet-url>")
-    .description("Bind a twitter account to your agent (charges verification fee). Tweet must contain your agent ID.")
-    .action(async (agentId: string, username: string, tweetUrl: string, _opts: any, cmd: Command) => {
+Tweet URL format:
+  https://x.com/<username>/status/<id>
+
+Example:
+  npx naracli agent bind-twitter https://x.com/yourname/status/123456789`)
+    .action(async (tweetUrl: string | undefined, opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        const agentId = await resolveAgentId({ ...globalOpts, agentId: opts.agentId });
+
+        if (!tweetUrl) {
+          // No URL provided — check status and show tips
+          const rpcUrl = getRpcUrl(globalOpts.rpcUrl);
+          const connection = new Connection(rpcUrl, "confirmed");
+          try {
+            const tw = await getAgentTwitter(connection, agentId);
+            if (tw) {
+              const status = TWITTER_STATUS[tw.status] ?? `unknown(${tw.status})`;
+              console.log("");
+              console.log(`  Twitter already bound: @${tw.username} (${status})`);
+              console.log(`  Tweet: ${tw.tweetUrl}`);
+              if (tw.verifiedAt) console.log(`  Verified: ${new Date(tw.verifiedAt * 1000).toISOString()}`);
+              console.log("");
+              return;
+            }
+          } catch {
+            // No binding found
+          }
+          console.log("");
+          console.log(`  Bind your Twitter to get stake-free PoMI mining credits!`);
+          console.log(`  1. Post a tweet with this content:`);
+          console.log(`     I'm claiming my AI agent "${agentId}" on NaraChain @NaraBuildAI`);
+          console.log(`  2. Then run:`);
+          console.log(`     npx naracli agent bind-twitter <tweet-url>`);
+          console.log(`     (URL format: https://x.com/<username>/status/<id>)`);
+          console.log("");
+          return;
+        }
+
+        const { username } = parseTweetUrl(tweetUrl);
         await handleAgentTwitterSet(agentId, username, tweetUrl, globalOpts);
       } catch (error: any) {
         printError(error.message);
@@ -733,13 +835,15 @@ export function registerAgentCommands(program: Command): void {
       }
     });
 
-  // agent unbind-twitter <agent-id> <username>
+  // agent unbind-twitter <username>
   agent
-    .command("unbind-twitter <agent-id> <username>")
+    .command("unbind-twitter <username>")
     .description("Unbind twitter from your agent")
-    .action(async (agentId: string, username: string, _opts: any, cmd: Command) => {
+    .option("--agent-id <id>", "Agent ID (defaults to saved myid)")
+    .action(async (username: string, opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        const agentId = await resolveAgentId({ ...globalOpts, agentId: opts.agentId });
         await handleAgentTwitterUnbind(agentId, username, globalOpts);
       } catch (error: any) {
         printError(error.message);
@@ -747,28 +851,17 @@ export function registerAgentCommands(program: Command): void {
       }
     });
 
-  // agent submit-tweet <agent-id> <username> <tweet-url>
+  // agent submit-tweet <tweet-url>
   agent
-    .command("submit-tweet <agent-id> <username> <tweet-url>")
+    .command("submit-tweet <tweet-url>")
     .description("Submit a tweet for verification and earn rewards (charges verification fee)")
-    .action(async (agentId: string, username: string, tweetUrl: string, _opts: any, cmd: Command) => {
+    .option("--agent-id <id>", "Agent ID (defaults to saved myid)")
+    .action(async (tweetUrl: string, opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
-        await handleAgentSubmitTweet(agentId, username, tweetUrl, globalOpts);
-      } catch (error: any) {
-        printError(error.message);
-        process.exit(1);
-      }
-    });
-
-  // agent tweet-status <agent-id>
-  agent
-    .command("tweet-status <agent-id>")
-    .description("Check tweet verification status")
-    .action(async (agentId: string, _opts: any, cmd: Command) => {
-      try {
-        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
-        await handleAgentTweetStatus(agentId, globalOpts);
+        const agentId = await resolveAgentId({ ...globalOpts, agentId: opts.agentId });
+        const { tweetId } = parseTweetUrl(tweetUrl);
+        await handleAgentSubmitTweet(agentId, tweetId, tweetUrl, globalOpts);
       } catch (error: any) {
         printError(error.message);
         process.exit(1);

@@ -233,7 +233,7 @@ async function handleQuestAnswer(
   const rpcUrl = getRpcUrl(options.rpcUrl);
   const connection = new Connection(rpcUrl, "confirmed");
   const wallet = await loadWallet(options.wallet);
-  const networkConfig = loadNetworkConfig(rpcUrl);
+  const networkConfig = loadNetworkConfig(rpcUrl, wallet.publicKey.toBase58());
   const configAgentId = networkConfig.agent_id;
   const agent = options.agent ?? "naracli";
   const model = options.model ?? "";
