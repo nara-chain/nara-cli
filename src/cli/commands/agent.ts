@@ -191,11 +191,11 @@ async function handleAgentGet(agentId: string, options: GlobalOptions) {
       console.log("");
     } else {
       // Not bound — show bind tip
+      const tweetText = `Claiming my AI agent ${agentId} on NaraChain @NaraBuildAI`;
+      const tweetIntent = `https://x.com/intent/tweet?text=${tweetText.replace(/ /g, "%20")}`;
       console.log(`  Tip: Bind your Twitter to get stake-free PoMI mining credits!`);
-      console.log(`  1. Post a tweet with this content:`);
-      console.log(`     I'm claiming my AI agent "${agentId}" on NaraChain @NaraBuildAI`);
-      console.log(`  2. Then run:`);
-      console.log(`     npx naracli agent bind-twitter <tweet-url>`);
+      console.log(`  1. Post a tweet: ${tweetIntent}`);
+      console.log(`  2. Then run: npx naracli agent bind-twitter <tweet-url>`);
       console.log("");
     }
   }
@@ -786,7 +786,7 @@ export function registerAgentCommands(program: Command): void {
     .option("--agent-id <id>", "Agent ID (defaults to saved myid)")
     .addHelpText("after", `
 Tweet content (replace <agent-id> with yours):
-  I'm claiming my AI agent "<agent-id>" on NaraChain @NaraBuildAI
+  Claiming my AI agent "<agent-id>" on NaraChain @NaraBuildAI
 
 Tweet URL format:
   https://x.com/<username>/status/<id>
@@ -816,13 +816,12 @@ Example:
           } catch {
             // No binding found
           }
+          const tweetText = `Claiming my AI agent ${agentId} on NaraChain @NaraBuildAI`;
+          const tweetIntent = `https://x.com/intent/tweet?text=${tweetText.replace(/ /g, "%20")}`;
           console.log("");
           console.log(`  Bind your Twitter to get stake-free PoMI mining credits!`);
-          console.log(`  1. Post a tweet with this content:`);
-          console.log(`     I'm claiming my AI agent "${agentId}" on NaraChain @NaraBuildAI`);
-          console.log(`  2. Then run:`);
-          console.log(`     npx naracli agent bind-twitter <tweet-url>`);
-          console.log(`     (URL format: https://x.com/<username>/status/<id>)`);
+          console.log(`  1. Post a tweet: ${tweetIntent}`);
+          console.log(`  2. Then run: npx naracli agent bind-twitter <tweet-url>`);
           console.log("");
           return;
         }
