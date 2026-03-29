@@ -126,7 +126,7 @@ async function handleAgentGet(agentId: string, options: GlobalOptions) {
     if (tv) {
       tweetVerifyData = {
         tweetId: tv.tweetId.toString(),
-        status: TWITTER_STATUS[tv.status] ?? `unknown(${tv.status})`,
+        status: TWEET_VERIFY_STATUS[tv.status] ?? `unknown(${tv.status})`,
         submittedAt: tv.submittedAt ? new Date(tv.submittedAt * 1000).toISOString() : null,
         lastRewardedAt: tv.lastRewardedAt ? new Date(tv.lastRewardedAt * 1000).toISOString() : null,
       };
@@ -167,7 +167,8 @@ async function handleAgentGet(agentId: string, options: GlobalOptions) {
     }
     // Tweet verification
     if (tweetVerifyData) {
-      console.log(`  Tweet verify: ${tweetVerifyData.tweetId} (${tweetVerifyData.status})`);
+      const verified = tweetVerifyData.lastRewardedAt ? "verified" : "unverified";
+      console.log(`  Tweet: ${tweetVerifyData.tweetId} (${verified})`);
       if (tweetVerifyData.lastRewardedAt) console.log(`  Tweet last rewarded: ${tweetVerifyData.lastRewardedAt}`);
     }
     console.log("");
@@ -177,16 +178,16 @@ async function handleAgentGet(agentId: string, options: GlobalOptions) {
         const lastRewarded = new Date(tweetVerifyData.lastRewardedAt).getTime();
         const hoursAgo = (Date.now() - lastRewarded) / (1000 * 60 * 60);
         if (hoursAgo >= 24) {
-          console.log(`  Tip: You can verify your tweet again to earn more stake-free credits.`);
-          console.log(`     npx naracli agent submit-tweet <tweet-url>`);
+          const h = Math.floor(hoursAgo);
+          console.log(`  Tip: Last tweet verified ${h}h ago (>24h). You can submit a new tweet to earn more stake-free credits.`);
         } else {
           const hoursLeft = Math.ceil(24 - hoursAgo);
           console.log(`  Tip: Next tweet verification available in ~${hoursLeft}h.`);
         }
       } else {
         console.log(`  Tip: Submit a tweet to earn stake-free PoMI mining credits!`);
-        console.log(`     npx naracli agent submit-tweet <tweet-url>`);
       }
+      console.log(`     npx naracli agent submit-tweet <tweet-url>`);
       console.log(`  Stake-free credits are based on tweet likes, bookmarks, retweets, and quotes.`);
       console.log("");
     } else {
@@ -415,6 +416,7 @@ async function handleAgentClear(options: GlobalOptions) {
 // ─── Twitter handlers ────────────────────────────────────────────
 
 const TWITTER_STATUS: Record<number, string> = { 0: "none", 1: "pending", 2: "verified", 3: "rejected" };
+const TWEET_VERIFY_STATUS: Record<number, string> = { 0: "ready", 1: "pending", 2: "approved", 3: "rejected" };
 
 /** Parse tweet URL and extract username + tweetId. Accepts https://x.com/<username>/status/<id> or https://twitter.com/<username>/status/<id>. */
 function parseTweetUrl(url: string): { username: string; tweetId: bigint; tweetUrl: string } {
