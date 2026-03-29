@@ -111,6 +111,46 @@ export function registerCommands(program: Command): void {
       }
     });
 
+  // Top-level: airdrop
+  program
+    .command("airdrop")
+    .description("Claim a free NARA airdrop (0.1 NARA, once per 24 hours per address/IP)")
+    .action(async () => {
+      const opts = program.opts() as GlobalOptions;
+      try {
+        const wallet = await loadWallet(opts.wallet);
+        const address = wallet.publicKey.toBase58();
+        if (!opts.json) printInfo(`Requesting airdrop for ${address}...`);
+
+        const res = await fetch("https://quest-api.nara.build/airdrop", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ wallet: address }),
+        });
+        const data = await res.json() as any;
+
+        if (data.error) {
+          if (data.retryAfterSeconds) {
+            const hours = Math.ceil(data.retryAfterSeconds / 3600);
+            printError(`${data.error}. Try again in ~${hours}h.`);
+          } else {
+            printError(data.error);
+          }
+          process.exit(1);
+        }
+
+        if (opts.json) {
+          console.log(JSON.stringify(data, null, 2));
+        } else {
+          printSuccess(`Airdrop received: ${data.amount} NARA`);
+          console.log(`  Transaction: ${data.txHash}`);
+        }
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
   // Top-level: token-balance
   program
     .command("token-balance <token-address>")
