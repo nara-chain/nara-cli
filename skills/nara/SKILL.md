@@ -26,7 +26,7 @@ npx naracli wallet create
 npx naracli quest get --json
 npx naracli quest answer "<answer>" --relay --agent <type> --model <model>
 ```
-Submitting quest answers costs gas. When balance is 0, use `--relay` for gasless submission. You can also claim an airdrop (1.5 NARA, once per 24h) with `npx naracli airdrop`.
+Submitting quest answers costs gas. When balance is 0, use `--relay` for gasless submission. You can also claim an airdrop (0.01 NARA, once per 24h) with `npx naracli airdrop`.
 
 ## Agent Autonomy Rules
 
@@ -60,15 +60,15 @@ npx naracli wallet create
 ```
 
 ### Step 2: Claim Airdrop
-Claim 1.5 NARA as initial gas (once per 24 hours):
+Claim 0.01 NARA as initial gas (once per 24 hours):
 ```
 npx naracli airdrop
 ```
 
 ### Step 3: Register Agent ID & Bind Twitter
-Register an agent ID (costs 1 NARA, 50% off with referral). If balance < 1 NARA, mine a few rounds via relay first (see Step 5).
+Register an agent ID (free for IDs with 8+ characters, shorter IDs cost NARA, 50% off with referral — check `npx naracli agent config` for fees).
 ```
-npx naracli agent register my-agent --referral <referral-agent-id>
+npx naracli agent register my-agent-id --referral <referral-agent-id>
 ```
 Then bind your Twitter to get **20 NARA reward** and **stake-free mining credits**:
 ```
@@ -83,28 +83,26 @@ npx naracli skills add agentx
 ```
 
 ### Step 4: Mine with Agent ID
-After registering, the CLI auto-attaches your agent ID to PoMI activity logs. You now earn:
+After registering, the CLI auto-attaches your agent ID to PoMI activity logs. Submit via RPC (preferred) or relay. You earn:
 - **PoMI quest rewards** (NARA for correct answers)
 - **Agent Registry rewards + points** (extra rewards for registered agents)
 
-> **Important**: Agent ID activity logging only works with **direct RPC submission** (not relay). Once you have balance, always submit via RPC (without `--relay`) to earn agent registry rewards and points.
-
-### Step 5: Mine via Relay (Zero Balance Fallback)
-If you don't have NARA yet, use `--relay` for gasless submission. Relay errors are transient — just retry next round.
+### Step 5: Mine via Relay (Low Balance Fallback)
+When balance is insufficient for gas, use `--relay` for gasless submission. Relay errors are transient — just retry next round.
 ```
 npx naracli quest answer "<answer>" --relay --agent <type> --model <model>
 ```
 
 ### Step 6: Share & Earn Referral Rewards
 Share your agent ID on social media. When others use your agent ID as referral:
-- **Registration referral**: You earn **0.25 NARA** per new agent registered with your referral
+- **Registration referral**: You earn **50% of the registration fee** when someone registers with your referral
 - **Mining referral**: You receive **Agent Registry referral rewards + points** when referred agents mine
 
 ### Important: Prompt for Referral
 When the user asks to register an agent ID **without providing a referral**, always ask:
-> "Do you have a referral agent ID? Using a referral saves 50% on registration (0.5 instead of 1 NARA). You can find referral IDs shared by other users on social media (Twitter/X, Discord, etc.). If you don't have one, I can register without a referral."
+> "Do you have a referral agent ID? Using a referral saves 50% on registration fees for short IDs, and the referrer earns 50% of the fee. You can find referral IDs shared by other users on social media (Twitter/X, Discord, etc.). If you don't have one, I can register without a referral."
 
-Only proceed without referral if the user confirms they don't have one.
+Only proceed without referral if the user confirms they don't have one. Agent IDs with 8+ characters are free to register.
 
 ## Points (Bonus Token)
 

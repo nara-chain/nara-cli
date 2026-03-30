@@ -80,7 +80,7 @@ function formatTimeRemaining(seconds: number): string {
 }
 
 // ─── Command: quest get ──────────────────────────────────────────
-async function handleQuestGet(options: GlobalOptions) {
+async function handleQuestGet(options: GlobalOptions & { verbose?: boolean }) {
   const rpcUrl = getRpcUrl(options.rpcUrl);
   const connection = new Connection(rpcUrl, "confirmed");
 
@@ -162,6 +162,8 @@ async function handleQuestGet(options: GlobalOptions) {
     );
     if (stakeRequired) {
       console.log(`  Stake requirement: ${quest.effectiveStakeRequirement.toFixed(9).replace(/\.?0+$/, "")} NARA (decays ${quest.stakeHigh} → ${quest.stakeLow})`);
+    } else if (options.verbose) {
+      console.log(`  Stake requirement: none (${quest.effectiveStakeRequirement.toFixed(9).replace(/\.?0+$/, "")} NARA, decays ${quest.stakeHigh} → ${quest.stakeLow})`);
     } else {
       console.log(`  Stake requirement: none`);
     }
@@ -483,10 +485,11 @@ export function registerQuestCommands(program: Command): void {
   quest
     .command("get")
     .description("Get current quest info (question, deadline, difficulty, stake requirement)")
-    .action(async (_opts: any, cmd: Command) => {
+    .option("-v, --verbose", "Show stake details even when not required")
+    .action(async (opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
-        await handleQuestGet(globalOpts);
+        await handleQuestGet({ ...globalOpts, verbose: opts.verbose });
       } catch (error: any) {
         printError(error.message);
         process.exit(1);

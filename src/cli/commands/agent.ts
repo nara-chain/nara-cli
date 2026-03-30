@@ -492,8 +492,11 @@ async function handleAgentConfig(options: GlobalOptions) {
 
   const data = {
     registerFee: config.registerFee / DECIMALS,
-    referralRegisterFee: config.referralRegisterFee / DECIMALS,
-    referralFeeShare: config.referralFeeShare / DECIMALS,
+    registerFee7: config.registerFee7 / DECIMALS,
+    registerFee6: config.registerFee6 / DECIMALS,
+    registerFee5: config.registerFee5 / DECIMALS,
+    referralDiscountBps: config.referralDiscountBps,
+    referralShareBps: config.referralShareBps,
     activityReward: config.activityReward / DECIMALS,
     referralActivityReward: config.referralActivityReward / DECIMALS,
     pointsSelf: config.pointsSelf,
@@ -510,9 +513,12 @@ async function handleAgentConfig(options: GlobalOptions) {
     formatOutput(data, true);
   } else {
     console.log("");
-    console.log(`  Register Fee:              ${data.registerFee} NARA (${config.registerFee} lamports)`);
-    console.log(`  Referral Register Fee:     ${data.referralRegisterFee} NARA (${config.referralRegisterFee} lamports)`);
-    console.log(`  Referral Fee Share:        ${data.referralFeeShare} NARA (${config.referralFeeShare} lamports)`);
+    console.log(`  Register Fee (8+ chars):   ${data.registerFee} NARA (${config.registerFee} lamports)`);
+    console.log(`  Register Fee (7 chars):    ${data.registerFee7} NARA (${config.registerFee7} lamports)`);
+    console.log(`  Register Fee (6 chars):    ${data.registerFee6} NARA (${config.registerFee6} lamports)`);
+    console.log(`  Register Fee (5 chars):    ${data.registerFee5} NARA (${config.registerFee5} lamports)`);
+    console.log(`  Referral Discount:         ${config.referralDiscountBps / 100}% (${config.referralDiscountBps} BPS)`);
+    console.log(`  Referral Share:            ${config.referralShareBps / 100}% (${config.referralShareBps} BPS)`);
     console.log(`  Activity Reward:           ${data.activityReward} NARA (${config.activityReward} lamports)`);
     console.log(`  Referral Activity Reward:  ${data.referralActivityReward} NARA (${config.referralActivityReward} lamports)`);
     console.log(`  Points (self):             ${data.pointsSelf}`);
@@ -556,7 +562,7 @@ export function registerAgentCommands(program: Command): void {
   // agent register
   agent
     .command("register <agent-id>")
-    .description("Register a new agent on-chain (costs 1 NARA, 50% off with referral). Agent ID must be lowercase alphanumeric with hyphens.")
+    .description("Register a new agent on-chain (free for 8+ char IDs, shorter IDs cost NARA, 50% off with referral — see 'agent config'). Lowercase alphanumeric with hyphens.")
     .option("--referral <agent-id>", "Referral agent ID — saves 50% on registration fee")
     .action(async (agentId: string, opts: { referral?: string }, cmd: Command) => {
       try {
