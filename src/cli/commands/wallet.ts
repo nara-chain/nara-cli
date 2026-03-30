@@ -37,7 +37,7 @@ import type {
   WalletBalanceOptions,
   TokenBalanceOptions,
   TxStatusOptions,
-  TransferSolOptions,
+  TransferNaraOptions,
   TransferTokenOptions,
 } from "../types";
 
@@ -124,19 +124,19 @@ export async function handleWalletBalance(
 
   // Get balance
   const balance = await connection.getBalance(pubkey);
-  const balanceSOL = balance / LAMPORTS_PER_SOL;
+  const balanceNara = balance / LAMPORTS_PER_SOL;
 
   // Output result
   if (options.json) {
     const output = {
       address: pubkey.toBase58(),
-      balance: balanceSOL,
+      balance: balanceNara,
       lamports: balance,
     };
     console.log(JSON.stringify(output, null, 2));
   } else {
     console.log(`\nWallet: ${pubkey.toBase58()}`);
-    console.log(`Balance: ${balanceSOL.toFixed(4)} NARA (${balance.toLocaleString()} lamports)`);
+    console.log(`Balance: ${balanceNara.toFixed(4)} NARA (${balance.toLocaleString()} lamports)`);
   }
 }
 
@@ -320,15 +320,15 @@ export async function handleTxStatus(
 }
 
 /**
- * Handle transfer SOL command
+ * Handle transfer NARA command
  * @param to Recipient address
- * @param amount Amount in SOL
+ * @param amount Amount in NARA
  * @param options Command options
  */
-export async function handleTransferSol(
+export async function handleTransferNara(
   to: string,
   amount: string,
-  options: Omit<TransferSolOptions, "to" | "amount">
+  options: Omit<TransferNaraOptions, "to" | "amount">
 ): Promise<void> {
   // Load wallet
   const wallet = await loadWallet(options.wallet);
@@ -339,11 +339,11 @@ export async function handleTransferSol(
 
   // Validate inputs
   const recipient = validatePublicKey(to);
-  const amountSOL = validatePositiveNumber(amount, "amount");
-  const lamports = Math.floor(amountSOL * LAMPORTS_PER_SOL);
+  const amountNara = validatePositiveNumber(amount, "amount");
+  const lamports = Math.floor(amountNara * LAMPORTS_PER_SOL);
 
   printInfo(`To: ${recipient.toBase58()}`);
-  printInfo(`Amount: ${amountSOL} NARA`);
+  printInfo(`Amount: ${amountNara} NARA`);
 
   // Initialize SDK
   const sdk = new NaraSDK({
@@ -381,7 +381,7 @@ export async function handleTransferSol(
     const output = {
       from: wallet.publicKey.toBase58(),
       to: recipient.toBase58(),
-      amount: amountSOL,
+      amount: amountNara,
       lamports,
       ...(txResult.signature && { signature: txResult.signature }),
       ...(txResult.base64 && { transaction: txResult.base64 }),
@@ -391,7 +391,7 @@ export async function handleTransferSol(
     console.log(`\nTransfer Details:`);
     console.log(`  From: ${wallet.publicKey.toBase58()}`);
     console.log(`  To: ${recipient.toBase58()}`);
-    console.log(`  Amount: ${amountSOL} NARA`);
+    console.log(`  Amount: ${amountNara} NARA`);
     printTransactionResult(txResult, false);
   }
 }

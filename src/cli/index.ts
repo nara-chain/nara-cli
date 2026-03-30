@@ -18,7 +18,7 @@ import {
   handleWalletBalance,
   handleTokenBalance,
   handleTxStatus,
-  handleTransferSol,
+  handleTransferNara,
   handleTransferToken,
 } from "./commands/wallet";
 import { loadWallet, getRpcUrl } from "./utils/wallet";
@@ -29,7 +29,7 @@ import type {
   WalletBalanceOptions,
   TokenBalanceOptions,
   TxStatusOptions,
-  TransferSolOptions,
+  TransferNaraOptions,
   TransferTokenOptions,
 } from "./types";
 
@@ -186,9 +186,9 @@ export function registerCommands(program: Command): void {
     .description("Transfer NARA to another wallet")
     .option("-e, --export-tx", "Export unsigned transaction", false)
     .action(async (to: string, amount: string, options: { exportTx?: boolean }) => {
-      const opts = program.opts() as TransferSolOptions;
+      const opts = program.opts() as TransferNaraOptions;
       try {
-        await handleTransferSol(to, amount, { ...opts, ...options });
+        await handleTransferNara(to, amount, { ...opts, ...options });
       } catch (error: any) {
         printError(error.message);
         process.exit(1);

@@ -58,7 +58,7 @@ async function resolveAgentId(options: GlobalOptions & { agentId?: string }): Pr
   const pubkey = await tryGetWalletPubkey(options.wallet);
   const networkConfig = loadNetworkConfig(rpcUrl, pubkey);
   if (!networkConfig.agent_id) {
-    printError('No agent ID specified. Use --agent-id or run "agent register <id>" first.');
+    printError('No agent ID registered for this wallet. Run "agent register <id>" to create one, or use --agent-id to query another agent.');
     process.exit(1);
   }
   return networkConfig.agent_id;

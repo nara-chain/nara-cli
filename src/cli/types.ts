@@ -41,12 +41,12 @@ export interface TxStatusOptions extends GlobalOptions {
 }
 
 /**
- * Transfer SOL command options
+ * Transfer NARA command options
  */
-export interface TransferSolOptions extends GlobalOptions {
+export interface TransferNaraOptions extends GlobalOptions {
   /** Recipient address */
   to: string;
-  /** Amount in SOL */
+  /** Amount in NARA */
   amount: number;
   /** Export unsigned transaction */
   exportTx?: boolean;
