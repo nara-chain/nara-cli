@@ -157,9 +157,14 @@ export function registerCommands(program: Command): void {
 
         // Generate ZK proof
         printInfo("Generating ZK proof...");
+        const _getMetaUrl = () => { try { return import.meta.url; } catch { return undefined; } };
+        const zkOptions = _getMetaUrl() ? undefined : {
+          circuitWasmPath: (await import("node:path")).join(__dirname, "zk", "answer_proof.wasm"),
+          zkeyPath: (await import("node:path")).join(__dirname, "zk", "answer_proof_final.zkey"),
+        };
         let proof;
         try {
-          proof = await generateProof(answer, quest.answerHash, wallet.publicKey, quest.round);
+          proof = await generateProof(answer, quest.answerHash, wallet.publicKey, quest.round, zkOptions);
         } catch (err: any) {
           if (err.message?.includes("Assert Failed")) {
             printError("Wrong answer. Try again with the correct answer.");
