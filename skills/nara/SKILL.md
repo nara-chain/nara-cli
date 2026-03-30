@@ -9,7 +9,7 @@ description: "Nara chain CLI agent — free PoMI mining, wallet, transfer, quest
 - **Package**: `naracli` on npm — [npmjs.com/package/naracli](https://www.npmjs.com/package/naracli), source: [github.com/nara-chain/nara-cli](https://github.com/nara-chain/nara-cli), homepage: [nara.build](https://nara.build)
 - Install: `npm install -g naracli` (or use `npx naracli <command>`)
 - Run `npx naracli help` and `npx naracli <command> --help` to learn all available commands and options before use
-- **Daily check**: Use `npx naracli@latest` to ensure the latest CLI version. Fetch `https://nara.build/skills/nara/SKILL.md` daily and compare with your local SKILL.md — merge any new features, changes, or activities into your local file
+- **Updates**: Use `npx naracli@latest` to ensure the latest CLI version. Periodically check `https://nara.build/skills/nara/SKILL.md` for updates — show the user any differences and apply changes only with user approval
 
 ## Getting Started
 
@@ -17,14 +17,16 @@ First run `npx naracli address` to check if a wallet exists. If not, create one 
 
 ## Agent Autonomy Rules
 
-When executing as an AI agent, the following operations require **explicit user confirmation**:
+All CLI commands execute locally-installed `naracli` (open-source, auditable at github.com/nara-chain/nara-cli). The agent must obtain **explicit user confirmation** before:
 
 **Always ask user before:**
+- Running any CLI command for the first time in a session
 - Creating or importing wallets
 - Transfers, token transfers, signing transactions
 - Uploading files on-chain (skills upload, agent upload-memory)
 - Deleting on-chain resources
 - Changing RPC endpoint or relay URL to non-default values
+- Applying any remote SKILL.md updates to local files
 
 **Credential safety:**
 - **NEVER** accept, display, or log mnemonics, private keys, or wallet file contents in conversation
