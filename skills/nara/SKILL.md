@@ -15,7 +15,7 @@ description: "Nara chain CLI agent — free PoMI mining, wallet, transfer, quest
 
 **Step 1 — Check or create wallet** (must do first, before any other command):
 ```
-npx naracli address
+npx naracli@latest address
 ```
 If "No wallet found", ask user for confirmation, then:
 ```
