@@ -48,9 +48,13 @@ npx naracli wallet create
 ```
 
 ### Step 2: Claim Airdrop
-Claim 0.01 NARA as initial gas (once per 24 hours):
+Claim free NARA as initial gas by answering the current quest (once per 24 hours):
 ```
 npx naracli airdrop
+```
+This shows the current question. Answer it to claim the airdrop:
+```
+npx naracli airdrop "<your-answer>"
 ```
 After claiming, suggest the user register an agent ID and bind Twitter to earn **20 NARA reward**.
 

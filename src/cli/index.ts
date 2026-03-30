@@ -114,18 +114,72 @@ export function registerCommands(program: Command): void {
   // Top-level: airdrop
   program
     .command("airdrop")
-    .description("Claim a free NARA airdrop (0.1 NARA, once per 24 hours per address/IP)")
-    .action(async () => {
+    .description("Claim a free NARA airdrop by answering the current quest (once per 24h per address/IP)")
+    .argument("[answer]", "Answer to the current quest question")
+    .action(async (answer: string | undefined) => {
       const opts = program.opts() as GlobalOptions;
       try {
         const wallet = await loadWallet(opts.wallet);
-        const address = wallet.publicKey.toBase58();
-        if (!opts.json) printInfo(`Requesting airdrop for ${address}...`);
+        const rpcUrl = getRpcUrl(opts.rpcUrl);
+        const connection = new (await import("@solana/web3.js")).Connection(rpcUrl, "confirmed");
+        const { getQuestInfo, generateProof } = await import("nara-sdk");
 
+        // Fetch quest info
+        let quest;
+        try {
+          quest = await getQuestInfo(connection, wallet);
+        } catch (err: any) {
+          printError(`Failed to fetch quest info: ${err.message}`);
+          process.exit(1);
+        }
+
+        if (!quest.active) {
+          printError("No active quest at the moment. Try again later.");
+          process.exit(1);
+        }
+
+        // No answer provided — show question and prompt
+        if (!answer) {
+          console.log("");
+          console.log(`  Question: ${quest.question}`);
+          console.log(`  Time remaining: ${quest.timeRemaining}s`);
+          console.log("");
+          console.log(`  Answer the question correctly to claim your free NARA airdrop:`);
+          console.log(`  npx naracli airdrop "<your-answer>"`);
+          console.log("");
+          return;
+        }
+
+        if (quest.expired) {
+          printError("Quest has expired. Wait for the next round and try again.");
+          process.exit(1);
+        }
+
+        // Generate ZK proof
+        printInfo("Generating ZK proof...");
+        let proof;
+        try {
+          proof = await generateProof(answer, quest.answerHash, wallet.publicKey, quest.round);
+        } catch (err: any) {
+          if (err.message?.includes("Assert Failed")) {
+            printError("Wrong answer. Try again with the correct answer.");
+          } else {
+            printError(`ZK proof generation failed: ${err.message}`);
+          }
+          process.exit(1);
+        }
+
+        // Submit to relay airdrop endpoint
+        printInfo("Submitting airdrop claim...");
         const res = await fetch("https://quest-api.nara.build/airdrop", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ wallet: address }),
+          body: JSON.stringify({
+            wallet: wallet.publicKey.toBase58(),
+            proofA: proof.hex.proofA,
+            proofB: proof.hex.proofB,
+            proofC: proof.hex.proofC,
+          }),
         });
         const data = await res.json() as any;
 
@@ -142,7 +196,7 @@ export function registerCommands(program: Command): void {
         if (opts.json) {
           console.log(JSON.stringify(data, null, 2));
         } else {
-          printSuccess(`Airdrop received: ${data.amount} NARA`);
+          printSuccess(`Airdrop claimed!`);
           console.log(`  Transaction: ${data.txHash}`);
         }
       } catch (error: any) {
