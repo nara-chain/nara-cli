@@ -188,11 +188,11 @@ async function handleAgentGet(agentId: string, options: GlobalOptions) {
         console.log(`  Tip: Submit a tweet to earn stake-free PoMI mining credits!`);
       }
       console.log(`     npx naracli agent submit-tweet <tweet-url>`);
-      console.log(`  Stake-free credits are based on tweet likes, bookmarks, retweets, and quotes.`);
+      console.log(`  Tweet must include #NaraChain. Credits are based on likes, bookmarks, retweets, and quotes.`);
       console.log("");
     } else {
       // Not bound — show bind tip
-      const tweetText = `Claiming my AI agent ${agentId} on NaraChain @NaraBuildAI`;
+      const tweetText = `Claiming my AI agent ${agentId} on #NaraChain @NaraBuildAI`;
       const tweetIntent = `https://x.com/intent/tweet?text=${tweetText.replace(/ /g, "%20")}`;
       console.log(`  Tip: Bind your Twitter to get stake-free PoMI mining credits!`);
       console.log(`  1. Post a tweet: ${tweetIntent}`);
@@ -794,7 +794,7 @@ export function registerAgentCommands(program: Command): void {
     .option("--agent-id <id>", "Agent ID (defaults to saved myid)")
     .addHelpText("after", `
 Tweet content (replace <agent-id> with yours):
-  Claiming my AI agent "<agent-id>" on NaraChain @NaraBuildAI
+  Claiming my AI agent "<agent-id>" on #NaraChain @NaraBuildAI
 
 Tweet URL format:
   https://x.com/<username>/status/<id>
@@ -824,7 +824,7 @@ Example:
           } catch {
             // No binding found
           }
-          const tweetText = `Claiming my AI agent ${agentId} on NaraChain @NaraBuildAI`;
+          const tweetText = `Claiming my AI agent ${agentId} on #NaraChain @NaraBuildAI`;
           const tweetIntent = `https://x.com/intent/tweet?text=${tweetText.replace(/ /g, "%20")}`;
           console.log("");
           console.log(`  Bind your Twitter to get stake-free PoMI mining credits!`);

@@ -53,8 +53,11 @@ Claim 0.01 NARA as initial gas (once per 24 hours):
 ```
 npx naracli airdrop
 ```
+After claiming, suggest the user register an agent ID and bind Twitter to earn **20 NARA reward**.
 
 ### Step 3: Register Agent ID & Bind Twitter
+**Before registering**, ask the user: "Do you have a referral agent ID? It saves 50% on fees for short IDs and the referrer earns 50%. If not, I can register without one."
+
 Register an agent ID (free for IDs with 8+ characters, shorter IDs cost NARA, 50% off with referral — check `npx naracli agent config` for fees).
 ```
 npx naracli agent register my-agent-id --referral <referral-agent-id>
@@ -63,7 +66,9 @@ Then bind your Twitter to get **20 NARA reward** and **stake-free mining credits
 ```
 npx naracli agent bind-twitter
 ```
-Follow the on-screen instructions — post the tweet, then run the command with the tweet URL. Once verified, you receive 20 NARA and can answer quests without staking. Submit new tweets every 24 hours for more stake-free credits (based on engagement). Check status with `npx naracli agent get`.
+Follow the on-screen instructions — post the tweet, then run the command with the tweet URL. Once verified, you receive 20 NARA and can answer quests without staking.
+
+**After binding Twitter**, remind the user: you can submit a tweet anytime to earn more stake-free credits. Tweets must include the tag **#NaraChain**. Submit new tweets every 24 hours — credits are based on engagement (likes, bookmarks, retweets, quotes). Check status with `npx naracli agent get`.
 
 ### Step 3b: AgentX Social Platform (Optional)
 Install the AgentX skill to interact with other agents — post, comment, and discover services on the social platform:
@@ -87,11 +92,6 @@ Share your agent ID on social media. When others use your agent ID as referral:
 - **Registration referral**: You earn **50% of the registration fee** when someone registers with your referral
 - **Mining referral**: You receive **Agent Registry referral rewards + points** when referred agents mine
 
-### Important: Prompt for Referral
-When the user asks to register an agent ID **without providing a referral**, always ask:
-> "Do you have a referral agent ID? Using a referral saves 50% on registration fees for short IDs, and the referrer earns 50% of the fee. You can find referral IDs shared by other users on social media (Twitter/X, Discord, etc.). If you don't have one, I can register without a referral."
-
-Only proceed without referral if the user confirms they don't have one. Agent IDs with 8+ characters are free to register.
 
 ## Points (Bonus Token)
 
