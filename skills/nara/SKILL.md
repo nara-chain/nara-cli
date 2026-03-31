@@ -1,13 +1,19 @@
 ---
 name: nara
 description: "Nara chain CLI agent — free PoMI mining, wallet, transfer, quest, on-chain skills, ZK ID, agent registry. Triggers: NARA, quest, mining, airdrop, earn/claim/collect NARA, wallet, balance, transfer, skills, zkid, agent, referral, PoMI, keypair, mnemonic, faucet, deposit, withdraw."
+metadata:
+  requires: "node>=18, npm"
+  package: "naracli"
+  homepage: "https://nara.build"
+  repository: "https://github.com/nara-chain/nara-cli"
 ---
 
 ## Prerequisites
 
-- **Node.js** (>=18) and **npm** are required
+- **Requires**: Node.js (>=18) and npm
 - **Package**: `naracli` on npm — [npmjs.com/package/naracli](https://www.npmjs.com/package/naracli), source: [github.com/nara-chain/nara-cli](https://github.com/nara-chain/nara-cli), homepage: [nara.build](https://nara.build)
-- Install: `npm install -g naracli` (or use `npx naracli <command>`)
+- **Install**: `npm install -g naracli` (or use `npx naracli <command>`). This installs code from the public npm registry — **before first install, the agent must inform the user** and obtain explicit approval. Users should review: [npm package](https://www.npmjs.com/package/naracli), [GitHub source](https://github.com/nara-chain/nara-cli)
+- **Security**: Open-source, auditable on GitHub. The package does not upload, collect, or transmit wallet secrets — all key material stays local on disk
 - Run `npx naracli help` and `npx naracli <command> --help` to learn all available commands and options before use
 - **Updates**: Use `npx naracli@latest` to ensure the latest CLI version
 
@@ -20,6 +26,7 @@ First run `npx naracli address` to check if a wallet exists. If not, create one 
 All CLI commands execute locally-installed `naracli` (open-source, auditable at github.com/nara-chain/nara-cli). The agent must obtain **explicit user confirmation** before:
 
 **Always ask user before:**
+- Installing or first running the naracli package (inform user it executes code from npm registry)
 - Running any CLI command for the first time in a session
 - Creating or importing wallets
 - Transfers, token transfers, signing transactions
@@ -31,6 +38,7 @@ All CLI commands execute locally-installed `naracli` (open-source, auditable at 
 - **NEVER** accept, display, or log mnemonics, private keys, or wallet file contents in conversation
 - If a user pastes a mnemonic or private key, warn them immediately and do NOT store or repeat it
 - Wallet creation and import are handled entirely by the CLI — the agent should only run the command, not process secrets
+- When running wallet create/import commands, do NOT capture or parse CLI stdout/stderr — only confirm success or report the error message. The CLI writes key material directly to a file, never to stdout
 - Only use default RPC/relay endpoints (shown in `npx naracli quest answer --help`); warn if the user provides a custom URL
 
 **Safe to run without confirmation:**
