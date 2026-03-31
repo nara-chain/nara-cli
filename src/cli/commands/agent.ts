@@ -3,7 +3,7 @@
  */
 
 import { Command } from "commander";
-import { Connection, PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { loadWallet, getRpcUrl } from "../utils/wallet";
 import {
   printError,
@@ -39,7 +39,36 @@ import { readFileSync } from "node:fs";
 import { loadNetworkConfig, setAgentId, clearAgentId } from "../utils/agent-config";
 import { validateName } from "../utils/validation";
 
+const DEFAULT_RELAY_URL = process.env.QUEST_RELAY_URL || "https://quest-api.nara.build/";
+
 // ─── Helpers ─────────────────────────────────────────────────────
+
+/**
+ * Call a relay endpoint, get partial-signed tx, sign locally, send to RPC.
+ * @returns transaction signature
+ */
+async function relaySignAndSend(
+  connection: Connection,
+  wallet: import("@solana/web3.js").Keypair,
+  relayUrl: string,
+  endpoint: string,
+  body: Record<string, any>,
+): Promise<string> {
+  const url = relayUrl.replace(/\/+$/, "") + endpoint;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json() as any;
+  if (data.error) throw new Error(data.error);
+
+  const txBuf = Buffer.from(data.transaction, "base64");
+  const tx = VersionedTransaction.deserialize(new Uint8Array(txBuf));
+  tx.sign([wallet]);
+  const sig = await connection.sendTransaction(tx, { maxRetries: 3 });
+  return sig;
+}
 
 /** Try to get wallet pubkey without failing. */
 async function tryGetWalletPubkey(walletPath?: string): Promise<string | undefined> {
@@ -66,7 +95,7 @@ async function resolveAgentId(options: GlobalOptions & { agentId?: string }): Pr
 
 // ─── Command handlers ────────────────────────────────────────────
 
-async function handleAgentRegister(agentId: string, options: GlobalOptions & { referral?: string }) {
+async function handleAgentRegister(agentId: string, options: GlobalOptions & { referral?: string; relay?: string }) {
   validateName(agentId, "Agent ID");
   const rpcUrl = getRpcUrl(options.rpcUrl);
   const wallet = await loadWallet(options.wallet);
@@ -82,17 +111,27 @@ async function handleAgentRegister(agentId: string, options: GlobalOptions & { r
   const connection = new Connection(rpcUrl, "confirmed");
 
   if (!options.json) printInfo(`Registering agent "${agentId}"...`);
-  const result = options.referral
-    ? await registerAgentWithReferral(connection, wallet, agentId, options.referral)
-    : await registerAgent(connection, wallet, agentId);
+
+  let signature: string;
+  if (options.relay) {
+    const relayUrl = options.relay === "true" || options.relay === "" ? DEFAULT_RELAY_URL : options.relay;
+    const body: Record<string, any> = { authority: pubkey, agentId };
+    if (options.referral) body.referralAgentId = options.referral;
+    signature = await relaySignAndSend(connection, wallet, relayUrl, "/register-agent", body);
+  } else {
+    const result = options.referral
+      ? await registerAgentWithReferral(connection, wallet, agentId, options.referral)
+      : await registerAgent(connection, wallet, agentId);
+    signature = result.signature;
+  }
+
   if (!options.json) printSuccess(`Agent "${agentId}" registered!`);
   setAgentId(agentId, rpcUrl, pubkey);
 
   if (options.json) {
-    formatOutput({ agentId, referral: options.referral ?? null, signature: result.signature, agentPubkey: result.agentPubkey.toBase58() }, true);
+    formatOutput({ agentId, referral: options.referral ?? null, signature }, true);
   } else {
-    console.log(`  Transaction: ${result.signature}`);
-    console.log(`  Agent PDA: ${result.agentPubkey.toBase58()}`);
+    console.log(`  Transaction: ${signature}`);
     if (options.referral) console.log(`  Referral: ${options.referral}`);
   }
 }
@@ -428,13 +467,23 @@ function parseTweetUrl(url: string): { username: string; tweetId: bigint; tweetU
   return { username: m[1], tweetId: BigInt(m[2]), tweetUrl: url };
 }
 
-async function handleAgentTwitterSet(agentId: string, username: string, tweetUrl: string, options: GlobalOptions) {
+async function handleAgentTwitterSet(agentId: string, username: string, tweetUrl: string, options: GlobalOptions & { relay?: string }) {
   const rpcUrl = getRpcUrl(options.rpcUrl);
   const connection = new Connection(rpcUrl, "confirmed");
   const wallet = await loadWallet(options.wallet);
 
   if (!options.json) printInfo(`Binding @${username} to agent "${agentId}"...`);
-  const signature = await setTwitter(connection, wallet, agentId, username, tweetUrl);
+
+  let signature: string;
+  if (options.relay) {
+    const relayUrl = options.relay === "true" || options.relay === "" ? DEFAULT_RELAY_URL : options.relay;
+    signature = await relaySignAndSend(connection, wallet, relayUrl, "/set-twitter", {
+      authority: wallet.publicKey.toBase58(), agentId, username, tweetUrl,
+    });
+  } else {
+    signature = await setTwitter(connection, wallet, agentId, username, tweetUrl);
+  }
+
   if (!options.json) printSuccess(`Twitter @${username} submitted for verification!`);
 
   if (options.json) {
@@ -460,7 +509,7 @@ async function handleAgentTwitterUnbind(agentId: string, username: string, optio
   }
 }
 
-async function handleAgentSubmitTweet(agentId: string, tweetId: bigint, tweetUrl: string, options: GlobalOptions) {
+async function handleAgentSubmitTweet(agentId: string, tweetId: bigint, tweetUrl: string, options: GlobalOptions & { relay?: string }) {
   const rpcUrl = getRpcUrl(options.rpcUrl);
   const connection = new Connection(rpcUrl, "confirmed");
   const wallet = await loadWallet(options.wallet);
@@ -473,7 +522,16 @@ async function handleAgentSubmitTweet(agentId: string, tweetId: bigint, tweetUrl
   }
 
   if (!options.json) printInfo(`Submitting tweet for verification...`);
-  const signature = await submitTweet(connection, wallet, agentId, tweetId);
+
+  let signature: string;
+  if (options.relay) {
+    const relayUrl = options.relay === "true" || options.relay === "" ? DEFAULT_RELAY_URL : options.relay;
+    signature = await relaySignAndSend(connection, wallet, relayUrl, "/submit-tweet", {
+      authority: wallet.publicKey.toBase58(), agentId, tweetId: tweetId.toString(),
+    });
+  } else {
+    signature = await submitTweet(connection, wallet, agentId, tweetId);
+  }
   if (!options.json) printSuccess(`Tweet submitted for verification!`);
 
   if (options.json) {
@@ -564,10 +622,12 @@ export function registerAgentCommands(program: Command): void {
     .command("register <agent-id>")
     .description("Register a new agent on-chain (free for 8+ char IDs, shorter IDs cost NARA, 50% off with referral — see 'agent config'). Lowercase alphanumeric with hyphens.")
     .option("--referral <agent-id>", "Referral agent ID — saves 50% on registration fee")
-    .action(async (agentId: string, opts: { referral?: string }, cmd: Command) => {
+    .option("--relay [url]", "Submit via gasless relay (relay pays gas)")
+    .action(async (agentId: string, opts: { referral?: string; relay?: string }, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
-        await handleAgentRegister(agentId, { ...globalOpts, ...opts });
+        const relay = opts.relay === true ? "true" : opts.relay;
+        await handleAgentRegister(agentId, { ...globalOpts, referral: opts.referral, relay });
       } catch (error: any) {
         printError(error.message);
         process.exit(1);
@@ -792,6 +852,7 @@ export function registerAgentCommands(program: Command): void {
     .command("bind-twitter [tweet-url]")
     .description("Bind twitter to your agent for stake-free PoMI credits")
     .option("--agent-id <id>", "Agent ID (defaults to saved myid)")
+    .option("--relay [url]", "Submit via gasless relay (relay pays gas)")
     .addHelpText("after", `
 Tweet content (replace <agent-id> with yours):
   Claiming my AI agent "<agent-id>" on #NaraChain @NaraBuildAI
@@ -835,7 +896,8 @@ Example:
         }
 
         const { username } = parseTweetUrl(tweetUrl);
-        await handleAgentTwitterSet(agentId, username, tweetUrl, globalOpts);
+        const relay = opts.relay === true ? "true" : opts.relay;
+        await handleAgentTwitterSet(agentId, username, tweetUrl, { ...globalOpts, relay });
       } catch (error: any) {
         printError(error.message);
         process.exit(1);
@@ -863,12 +925,14 @@ Example:
     .command("submit-tweet <tweet-url>")
     .description("Submit a tweet for verification and earn rewards (charges verification fee)")
     .option("--agent-id <id>", "Agent ID (defaults to saved myid)")
+    .option("--relay [url]", "Submit via gasless relay (relay pays gas)")
     .action(async (tweetUrl: string, opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
         const agentId = await resolveAgentId({ ...globalOpts, agentId: opts.agentId });
         const { tweetId } = parseTweetUrl(tweetUrl);
-        await handleAgentSubmitTweet(agentId, tweetId, tweetUrl, globalOpts);
+        const relay = opts.relay === true ? "true" : opts.relay;
+        await handleAgentSubmitTweet(agentId, tweetId, tweetUrl, { ...globalOpts, relay });
       } catch (error: any) {
         printError(error.message);
         process.exit(1);
