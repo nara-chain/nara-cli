@@ -82,6 +82,43 @@ export function registerCommands(program: Command): void {
   // config
   registerConfigCommands(program);
 
+  // Top-level: guide
+  program
+    .command("guide")
+    .description("Show the full NARA usage guide (SKILL.md)")
+    .action(async () => {
+      try {
+        const { readFileSync, existsSync } = await import("node:fs");
+        const { join, resolve } = await import("node:path");
+        // Try multiple paths: project root (dev), dist dir (bundle), npm global
+        const candidates = [
+          join(resolve("."), "skills", "nara", "SKILL.md"),
+        ];
+        // CJS bundle mode: __dirname is available
+        if (typeof __dirname !== "undefined") {
+          candidates.push(join(__dirname, "..", "skills", "nara", "SKILL.md"));
+          candidates.push(join(__dirname, "skills", "nara", "SKILL.md"));
+        }
+        let content = "";
+        for (const p of candidates) {
+          if (existsSync(p)) {
+            content = readFileSync(p, "utf-8");
+            break;
+          }
+        }
+        if (!content) {
+          printError("SKILL.md not found. Reinstall naracli or run from the project directory.");
+          process.exit(1);
+        }
+        // Strip frontmatter
+        const stripped = content.replace(/^---[\s\S]*?---\n*/, "");
+        console.log(stripped);
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
   // Top-level: address
   program
     .command("address")

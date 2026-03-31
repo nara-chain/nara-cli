@@ -1,6 +1,6 @@
 {
   "name": "naracli",
-  "version": "1.0.74",
+  "version": "1.0.75",
   "description": "CLI for the Nara chain (Solana-compatible)",
   "homepage": "https://nara.build",
   "repository": {
@@ -33,6 +33,7 @@
   "files": [
     "dist",
     "src",
+    "skills",
     "index.ts",
     "bin"
   ],

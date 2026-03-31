@@ -234,7 +234,9 @@ async function handleAgentGet(agentId: string, options: GlobalOptions) {
       const tweetText = `Claiming my AI agent ${agentId} on #NaraChain @NaraBuildAI`;
       const tweetIntent = `https://x.com/intent/tweet?text=${tweetText.replace(/ /g, "%20").replace(/#/g, "%23")}`;
       console.log(`  Tip: Bind your Twitter to get stake-free PoMI mining credits!`);
-      console.log(`  1. Post a tweet: ${tweetIntent}`);
+      console.log(`  1. Post a tweet with this content:`);
+      console.log(`     ${tweetText}`);
+      console.log(`     Link: ${tweetIntent}`);
       console.log(`  2. Then run: npx naracli agent bind-twitter <tweet-url>`);
       console.log("");
     }
@@ -889,7 +891,9 @@ Example:
           const tweetIntent = `https://x.com/intent/tweet?text=${tweetText.replace(/ /g, "%20").replace(/#/g, "%23")}`;
           console.log("");
           console.log(`  Bind your Twitter to get stake-free PoMI mining credits!`);
-          console.log(`  1. Post a tweet: ${tweetIntent}`);
+          console.log(`  1. Post a tweet with this content:`);
+          console.log(`     ${tweetText}`);
+          console.log(`     Link: ${tweetIntent}`);
           console.log(`  2. Then run: npx naracli agent bind-twitter <tweet-url>`);
           console.log("");
           return;
