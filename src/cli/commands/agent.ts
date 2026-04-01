@@ -466,6 +466,10 @@ function parseTweetUrl(url: string): { username: string; tweetId: bigint; tweetU
     printError(`Invalid tweet URL. Expected format: https://x.com/<username>/status/<id>`);
     process.exit(1);
   }
+  if (m[1] === "i") {
+    printError(`This URL uses x.com/i/ redirect and does not contain your real username. Please copy the tweet URL from your profile page (format: https://x.com/<username>/status/<id>).`);
+    process.exit(1);
+  }
   return { username: m[1], tweetId: BigInt(m[2]), tweetUrl: url };
 }
 
