@@ -119,6 +119,26 @@ export function registerCommands(program: Command): void {
       }
     });
 
+  // Top-level: activity
+  program
+    .command("activity")
+    .description("Show current community activities and events (check daily for new rewards)")
+    .action(async () => {
+      try {
+        const res = await fetch("https://nara.build/activity.md");
+        if (!res.ok) {
+          printError(`Failed to fetch activity info (HTTP ${res.status})`);
+          process.exit(1);
+        }
+        const content = await res.text();
+        const stripped = content.replace(/^---[\s\S]*?---\n*/, "");
+        console.log(stripped);
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
   // Top-level: address
   program
     .command("address")
