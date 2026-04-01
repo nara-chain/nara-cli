@@ -26,10 +26,24 @@ jobs:
 
       - run: npm run build
 
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git tag --sort=-creatordate | head -2 | tail -1)
+          if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "${{ github.ref_name }}" ]; then
+            echo "body=Initial release" >> $GITHUB_OUTPUT
+          else
+            LOG=$(git log ${PREV_TAG}..${{ github.ref_name }} --pretty=format:"- %s" --no-merges)
+            EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+            echo "body<<$EOF" >> $GITHUB_OUTPUT
+            echo "$LOG" >> $GITHUB_OUTPUT
+            echo "$EOF" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          body: ${{ steps.changelog.outputs.body }}
 
       - name: Publish to npm
         run: npm publish
