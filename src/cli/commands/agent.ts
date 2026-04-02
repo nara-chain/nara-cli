@@ -4,6 +4,7 @@
 
 import { Command } from "commander";
 import { Connection, PublicKey, VersionedTransaction } from "@solana/web3.js";
+import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { loadWallet, getRpcUrl } from "../utils/wallet";
 import {
   printError,
@@ -159,12 +160,13 @@ async function handleAgentGet(agentId: string, options: GlobalOptions) {
   }
 
   // Fetch tweet verification info
-  let tweetVerifyData: { tweetId: string; status: string; submittedAt: string | null; lastRewardedAt: string | null } | null = null;
+  let tweetVerifyData: { tweetId: string | null; status: string; submittedAt: string | null; lastRewardedAt: string | null } | null = null;
   try {
     const tv = await getTweetVerify(connection, agentId);
     if (tv) {
+      const tweetIdStr = tv.tweetId > 0n && tv.tweetId < 10000000000000000000n ? tv.tweetId.toString() : null;
       tweetVerifyData = {
-        tweetId: tv.tweetId.toString(),
+        tweetId: tweetIdStr,
         status: TWEET_VERIFY_STATUS[tv.status] ?? `unknown(${tv.status})`,
         submittedAt: tv.submittedAt ? new Date(tv.submittedAt * 1000).toISOString() : null,
         lastRewardedAt: tv.lastRewardedAt ? new Date(tv.lastRewardedAt * 1000).toISOString() : null,
@@ -174,12 +176,26 @@ async function handleAgentGet(agentId: string, options: GlobalOptions) {
     // Ignore
   }
 
+  // Fetch points balance
+  const POINTS_MINT = new PublicKey("AqJX47z8UT6k6gFpJjzvcAAP4NJkfykW8U8za1evry7J");
+  let points = "0";
+  try {
+    const authority = info.record.authority;
+    const tokenAccount = await getAssociatedTokenAddress(POINTS_MINT, authority, true, TOKEN_2022_PROGRAM_ID);
+    const balance = await connection.getTokenAccountBalance(tokenAccount);
+    points = balance.value.uiAmountString || "0";
+  } catch {
+    // No token account
+  }
+
   const data: Record<string, any> = {
     agentId: info.record.agentId,
     authority: info.record.authority.toBase58(),
     version: info.record.version,
     bio: info.bio,
     metadata: info.metadata,
+    points,
+    referralCount: info.record.referralCount,
     createdAt: new Date(info.record.createdAt * 1000).toISOString(),
     updatedAt: info.record.updatedAt ? new Date(info.record.updatedAt * 1000).toISOString() : null,
     twitter: twitterData,
@@ -195,6 +211,8 @@ async function handleAgentGet(agentId: string, options: GlobalOptions) {
     console.log(`  Version: ${data.version}`);
     console.log(`  Bio: ${data.bio ?? "(none)"}`);
     console.log(`  Metadata: ${data.metadata ?? "(none)"}`);
+    console.log(`  Points: ${data.points}`);
+    console.log(`  Referrals: ${data.referralCount}`);
     console.log(`  Created: ${data.createdAt}`);
     if (data.updatedAt) console.log(`  Updated: ${data.updatedAt}`);
     // Twitter binding
@@ -207,7 +225,10 @@ async function handleAgentGet(agentId: string, options: GlobalOptions) {
     // Tweet verification
     if (tweetVerifyData) {
       const verified = tweetVerifyData.lastRewardedAt ? "verified" : "unverified";
-      console.log(`  Tweet: ${tweetVerifyData.tweetId} (${verified})`);
+      if (tweetVerifyData.tweetId) {
+        const tweetUsername = twitterData?.username ?? "i";
+        console.log(`  Tweet: https://x.com/${tweetUsername}/status/${tweetVerifyData.tweetId} (${verified})`);
+      }
       if (tweetVerifyData.lastRewardedAt) console.log(`  Tweet last rewarded: ${tweetVerifyData.lastRewardedAt}`);
     }
     console.log("");
@@ -217,8 +238,8 @@ async function handleAgentGet(agentId: string, options: GlobalOptions) {
         const lastRewarded = new Date(tweetVerifyData.lastRewardedAt).getTime();
         const hoursAgo = (Date.now() - lastRewarded) / (1000 * 60 * 60);
         if (hoursAgo >= 24) {
-          const h = Math.floor(hoursAgo);
-          console.log(`  Tip: Last tweet verified ${h}h ago (>24h). You can submit a new tweet to earn more stake-free credits.`);
+          const agoStr = hoursAgo >= 48 ? `${Math.floor(hoursAgo / 24)}d` : `${Math.floor(hoursAgo)}h`;
+          console.log(`  Tip: Last tweet verified ${agoStr} ago (>24h). You can submit a new tweet to earn more stake-free credits.`);
         } else {
           const hoursLeft = Math.ceil(24 - hoursAgo);
           console.log(`  Tip: Next tweet verification available in ~${hoursLeft}h.`);
