@@ -61,7 +61,13 @@ async function relaySignAndSend(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const data = await res.json() as any;
+  const text = await res.text();
+  let data: any;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(`Relay returned invalid response: ${text.slice(0, 200)}`);
+  }
   if (data.error) throw new Error(data.error);
 
   const txBuf = Buffer.from(data.transaction, "base64");
@@ -124,6 +130,24 @@ async function handleAgentRegister(agentId: string, options: GlobalOptions & { r
       ? await registerAgentWithReferral(connection, wallet, agentId, options.referral)
       : await registerAgent(connection, wallet, agentId);
     signature = result.signature;
+  }
+
+  // Confirm transaction before saving config
+  if (!options.json) printInfo("Confirming transaction...");
+  try {
+    const confirmation = await connection.confirmTransaction(signature, "confirmed");
+    if (confirmation.value.err) {
+      printError(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      process.exit(1);
+    }
+  } catch {
+    printWarning("Could not confirm transaction. Verifying on-chain...");
+    try {
+      await getAgentInfo(connection, agentId);
+    } catch {
+      printError("Agent registration not found on-chain. Transaction may have failed.");
+      process.exit(1);
+    }
   }
 
   if (!options.json) printSuccess(`Agent "${agentId}" registered!`);
