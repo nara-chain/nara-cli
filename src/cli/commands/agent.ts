@@ -39,6 +39,7 @@ import {
 import { readFileSync } from "node:fs";
 import { loadNetworkConfig, setAgentId, clearAgentId } from "../utils/agent-config";
 import { validateName } from "../utils/validation";
+import { randomBindTweet, randomSubmitTweet } from "../utils/tweet-slogans";
 
 const DEFAULT_RELAY_URL = process.env.QUEST_RELAY_URL || "https://quest-api.nara.build/";
 
@@ -271,12 +272,16 @@ async function handleAgentGet(agentId: string, options: GlobalOptions) {
       } else {
         console.log(`  Tip: Submit a tweet to earn stake-free PoMI mining credits!`);
       }
-      console.log(`     npx naracli agent submit-tweet <tweet-url>`);
-      console.log(`  Tweet must include #NaraChain. Credits are based on likes, bookmarks, retweets, and quotes.`);
+      const submitTweetText = randomSubmitTweet();
+      const submitTweetIntent = `https://x.com/intent/tweet?text=${submitTweetText.replace(/ /g, "%20").replace(/#/g, "%23").replace(/"/g, "%22")}`;
+      console.log(`  Sample: ${submitTweetText}`);
+      console.log(`  Link: ${submitTweetIntent}`);
+      console.log(`  Then run: npx naracli agent submit-tweet <tweet-url>`);
+      console.log(`  Credits are based on likes, bookmarks, retweets, and quotes.`);
       console.log("");
     } else {
       // Not bound — show bind tip
-      const tweetText = `Claiming my AI agent "${agentId}" on #NaraChain @NaraBuildAI`;
+      const tweetText = randomBindTweet(agentId);
       const tweetIntent = `https://x.com/intent/tweet?text=${tweetText.replace(/ /g, "%20").replace(/#/g, "%23").replace(/"/g, "%22")}`;
       console.log(`  Tip: Bind your Twitter to earn 20 NARA + stake-free PoMI mining credits!`);
       console.log(`  1. Post a tweet with this content:`);
@@ -907,7 +912,7 @@ export function registerAgentCommands(program: Command): void {
     .option("--relay [url]", "Submit via gasless relay (relay pays gas)")
     .addHelpText("after", `
 Tweet content (replace <agent-id> with yours):
-  Claiming my AI agent "<agent-id>" on #NaraChain @NaraBuildAI
+  Claiming my AI agent "<agent-id>" on #NaraChain @NaraBuildAI — <random slogan>
 
 Tweet URL format:
   https://x.com/<username>/status/<id>
@@ -937,7 +942,7 @@ Example:
           } catch {
             // No binding found
           }
-          const tweetText = `Claiming my AI agent "${agentId}" on #NaraChain @NaraBuildAI`;
+          const tweetText = randomBindTweet(agentId);
           const tweetIntent = `https://x.com/intent/tweet?text=${tweetText.replace(/ /g, "%20").replace(/#/g, "%23").replace(/"/g, "%22")}`;
           console.log("");
           console.log(`  Bind your Twitter to earn 20 NARA + stake-free PoMI mining credits!`);
