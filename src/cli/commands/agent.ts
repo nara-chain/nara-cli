@@ -283,12 +283,12 @@ async function handleAgentGet(agentId: string, options: GlobalOptions) {
       // Not bound — show bind tip
       const tweetText = randomBindTweet(agentId);
       const tweetIntent = `https://x.com/intent/tweet?text=${tweetText.replace(/ /g, "%20").replace(/#/g, "%23").replace(/"/g, "%22")}`;
-      console.log(`  Tip: Bind your Twitter to earn 20 NARA + stake-free PoMI mining credits!`);
+      console.log(`  Tip: Bind your X(Twitter) to earn 20 NARA + stake-free PoMI mining credits!`);
       console.log(`  1. Post a tweet with this content:`);
       console.log(`     ${tweetText}`);
       console.log(`     Link: ${tweetIntent}`);
-      console.log(`  2. Then run: npx naracli agent bind-twitter <tweet-url>`);
-      console.log(`  3. Follow @NaraBuildAI: https://x.com/intent/follow?screen_name=NaraBuildAI`);
+      console.log(`  2. Follow @NaraBuildAI: https://x.com/intent/follow?screen_name=NaraBuildAI`);
+      console.log(`  3. Then run: npx naracli agent bind-twitter <tweet-url>`);
       console.log("");
     }
   }
@@ -945,13 +945,13 @@ Example:
           const tweetText = randomBindTweet(agentId);
           const tweetIntent = `https://x.com/intent/tweet?text=${tweetText.replace(/ /g, "%20").replace(/#/g, "%23").replace(/"/g, "%22")}`;
           console.log("");
-          console.log(`  Bind your Twitter to earn 20 NARA + stake-free PoMI mining credits!`);
+          console.log(`  Bind your X(Twitter) to earn 20 NARA + stake-free PoMI mining credits!`);
           console.log(`  1. Post a tweet with this content:`);
           console.log(`     ${tweetText}`);
           console.log(`     Link: ${tweetIntent}`);
-          console.log(`  2. Then run: npx naracli agent bind-twitter <tweet-url>`);
-          console.log(`  3. Follow @NaraBuildAI: https://x.com/intent/follow?screen_name=NaraBuildAI`);
-          console.log("");
+          console.log(`  2. Follow @NaraBuildAI: https://x.com/intent/follow?screen_name=NaraBuildAI`);
+          console.log(`  3. Then run: npx naracli agent bind-twitter <tweet-url>`);
+              console.log("");
           return;
         }
 
