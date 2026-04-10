@@ -11,7 +11,7 @@
 
 ---
 
-Wallet management, PoMI mining, agent registration, Twitter binding, and network interaction from the terminal.
+Wallet management, PoMI mining, agent registration, Twitter binding, cross-chain bridge, and network interaction from the terminal.
 
 ## Install
 
@@ -44,7 +44,7 @@ quest config                                        Show quest program config
 quest stake <amount>                                Stake NARA for quests
 quest unstake <amount>                              Unstake NARA
 quest stake-info                                    Get quest stake info
-agent register <agent-id> [--referral <id>]         Register agent (1 NARA, 50% off with referral)
+agent register <agent-id> [--referral] [--relay]     Register agent (free for 8+ chars, --relay for gasless)
 agent get                                           Get agent info, twitter binding, tweet status
 agent myid                                          Show your registered agent ID
 agent config                                        Show agent registry config (fees, rewards, points)
@@ -73,6 +73,11 @@ zkid info <name>                                    Get ZK ID info
 zkid deposit <name> <amount>                        Deposit NARA
 zkid scan [name] [-w]                               Scan claimable deposits
 zkid withdraw <name> [--recipient <addr>]           Withdraw deposit
+bridge transfer <token> <amount> --from <chain>      Bridge tokens between Solana and Nara (0.5% fee)
+bridge status <tx-or-message-id> --from <chain>     Check bridge transfer delivery status
+bridge tokens                                       List supported bridge tokens
+guide                                               Show the full NARA usage guide
+activity                                            Show current community activities
 config get                                          Show current config
 config set <key> <value>                            Set config value
 config reset [key]                                  Reset config to default

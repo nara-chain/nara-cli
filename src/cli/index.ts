@@ -13,6 +13,7 @@ import { registerSkillsCommands } from "./commands/skills";
 import { registerZkIdCommands } from "./commands/zkid";
 import { registerAgentCommands } from "./commands/agent";
 import { registerConfigCommands } from "./commands/config";
+import { registerBridgeCommands } from "./commands/bridge";
 import {
   handleWalletAddress,
   handleWalletBalance,
@@ -78,6 +79,9 @@ export function registerCommands(program: Command): void {
 
   // agent
   registerAgentCommands(program);
+
+  // bridge
+  registerBridgeCommands(program);
 
   // config
   registerConfigCommands(program);
