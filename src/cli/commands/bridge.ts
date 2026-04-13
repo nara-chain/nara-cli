@@ -223,6 +223,106 @@ function handleBridgeTokens(options: GlobalOptions) {
   }
 }
 
+// ─── Command: bridge info ────────────────────────────────────────
+
+async function handleBridgeInfo(options: GlobalOptions & { solanaRpc?: string }) {
+  const wallet = await loadWallet(options.wallet);
+  const owner = wallet.publicKey;
+
+  const naraConn = new Connection(getRpcUrl(options.rpcUrl), "confirmed");
+  const solConn = new Connection(getSolanaRpc(options.solanaRpc), "confirmed");
+
+  const { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } = await import("@solana/spl-token");
+
+  const tokens = Object.values(BRIDGE_TOKENS) as any[];
+
+  // Build all ATA addresses for both chains
+  const queries: Array<{ symbol: string; chain: string; conn: Connection; ata: PublicKey | null; decimals: number; isNative: boolean }> = [];
+
+  for (const t of tokens) {
+    // Solana side
+    if (t.solana.mint) {
+      const ata = await getAssociatedTokenAddress(t.solana.mint, owner, true, t.solana.tokenProgram);
+      queries.push({ symbol: t.symbol, chain: "solana", conn: solConn, ata, decimals: t.decimals, isNative: false });
+    } else {
+      queries.push({ symbol: t.symbol, chain: "solana", conn: solConn, ata: null, decimals: t.decimals, isNative: true });
+    }
+    // Nara side
+    if (t.nara.mint) {
+      const ata = await getAssociatedTokenAddress(t.nara.mint, owner, true, t.nara.tokenProgram);
+      queries.push({ symbol: t.symbol, chain: "nara", conn: naraConn, ata, decimals: t.decimals, isNative: false });
+    } else {
+      queries.push({ symbol: t.symbol, chain: "nara", conn: naraConn, ata: null, decimals: t.decimals, isNative: true });
+    }
+  }
+
+  // Batch fetch per chain
+  const solQueries = queries.filter(q => q.chain === "solana");
+  const naraQueries = queries.filter(q => q.chain === "nara");
+
+  // Fetch native balances
+  const [solNativeBalance, naraNativeBalance] = await Promise.all([
+    solConn.getBalance(owner),
+    naraConn.getBalance(owner),
+  ]);
+
+  // Fetch token accounts
+  const solAccounts = await solConn.getMultipleAccountsInfo(
+    solQueries.filter(q => q.ata).map(q => q.ata!)
+  );
+  const naraAccounts = await naraConn.getMultipleAccountsInfo(
+    naraQueries.filter(q => q.ata).map(q => q.ata!)
+  );
+
+  function parseTokenAmount(data: Buffer | null, decimals: number): string {
+    if (!data) return "0";
+    try {
+      const raw = BigInt("0x" + Buffer.from(data.slice(64, 72)).reverse().toString("hex"));
+      return (Number(raw) / 10 ** decimals).toString();
+    } catch { return "0"; }
+  }
+
+  // Build results
+  const results: Array<{ symbol: string; solana: string; nara: string }> = [];
+  let solTokenIdx = 0, naraTokenIdx = 0;
+
+  for (const t of tokens) {
+    let solBalance: string, naraBalance: string;
+
+    // Solana side
+    const sq = solQueries.find(q => q.symbol === t.symbol)!;
+    if (sq.isNative) {
+      solBalance = (solNativeBalance / LAMPORTS_PER_SOL).toString();
+    } else {
+      solBalance = parseTokenAmount(solAccounts[solTokenIdx]?.data as Buffer | null, sq.decimals);
+      solTokenIdx++;
+    }
+
+    // Nara side
+    const nq = naraQueries.find(q => q.symbol === t.symbol)!;
+    if (nq.isNative) {
+      naraBalance = (naraNativeBalance / LAMPORTS_PER_SOL).toString();
+    } else {
+      naraBalance = parseTokenAmount(naraAccounts[naraTokenIdx]?.data as Buffer | null, nq.decimals);
+      naraTokenIdx++;
+    }
+
+    results.push({ symbol: t.symbol, solana: solBalance, nara: naraBalance });
+  }
+
+  if (options.json) {
+    formatOutput({ owner: owner.toBase58(), balances: results }, true);
+  } else {
+    console.log(`\n  Owner: ${owner.toBase58()}\n`);
+    console.log(`  ${"Token".padEnd(8)} ${"Solana".padEnd(20)} Nara`);
+    console.log(`  ${"─".repeat(8)} ${"─".repeat(20)} ${"─".repeat(20)}`);
+    for (const r of results) {
+      console.log(`  ${r.symbol.padEnd(8)} ${r.solana.padEnd(20)} ${r.nara}`);
+    }
+    console.log("");
+  }
+}
+
 // ─── Register commands ───────────────────────────────────────────
 
 export function registerBridgeCommands(program: Command): void {
@@ -268,6 +368,21 @@ Examples:
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
         await handleBridgeStatus(id, { ...globalOpts, from: opts.from, solanaRpc: opts.solanaRpc });
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // bridge info
+  bridge
+    .command("info")
+    .description("Show bridgeable token balances on both Solana and Nara")
+    .option("--solana-rpc <url>", "Solana RPC endpoint (default: https://api.mainnet-beta.solana.com)")
+    .action(async (opts: any, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleBridgeInfo({ ...globalOpts, solanaRpc: opts.solanaRpc });
       } catch (error: any) {
         printError(error.message);
         process.exit(1);
