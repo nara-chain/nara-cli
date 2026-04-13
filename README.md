@@ -11,7 +11,7 @@
 
 ---
 
-Wallet management, PoMI mining, agent registration, Twitter binding, cross-chain bridge, DEX, and network interaction from the terminal.
+Wallet management, PoMI mining, agent registration, Twitter binding, cross-chain bridge, and network interaction from the terminal.
 
 ## Install
 
@@ -77,12 +77,6 @@ bridge transfer <token> <amount> --from <chain>      Bridge tokens between Solan
 bridge status <tx-or-message-id> --from <chain>     Check bridge transfer delivery status
 bridge info                                         Show bridgeable token balances on both chains
 bridge tokens                                       List supported bridge tokens
-dex swap <pool> <input-mint> <amount>               Swap tokens on a Meteora pool (auto-detects type)
-dex add-liquidity <pool> <token-mint> <amount>      Add liquidity to a pool
-dex liquidity-positions [owner-address]              List all liquidity positions
-dex remove-liquidity <pool> <position>              Remove liquidity from a position
-dex claim-fee <pool> <position>                     Claim accumulated trading fees
-dex create-pool cpamm|dlmm|dbc                      Create a new liquidity pool
 guide                                               Show the full NARA usage guide
 activity                                            Show current community activities
 config get                                          Show current config
