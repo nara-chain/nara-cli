@@ -330,9 +330,9 @@ export function registerBridgeCommands(program: Command): void {
     .command("bridge")
     .description("Cross-chain bridge between Solana and Nara (powered by Hyperlane)")
     .addHelpText("after", `
-Solana and Nara use the same wallet address (Ed25519). To bridge from Solana,
-your wallet must have SOL on Solana mainnet for gas.
-Bridge fee: 0.5%.
+1. Solana and Nara use the same wallet address (Ed25519). To bridge from Solana, your wallet must have SOL on Solana mainnet for gas.
+2. Delivery takes ~5-10 minutes (Hyperlane multi-validator signing).
+3. Bridge fee: 0.5%.
 
 Examples:
   npx naracli bridge transfer USDC 10 --from solana     # Solana → Nara
