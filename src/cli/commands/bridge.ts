@@ -22,16 +22,21 @@ import {
   type BridgeChain,
 } from "nara-sdk";
 
-const SOLANA_RPC = "https://api.mainnet-beta.solana.com";
+const DEFAULT_SOLANA_RPC = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
 const NARA_RPC = "https://mainnet-api.nara.build/";
 
-function getSourceConnection(fromChain: BridgeChain, rpcUrl?: string): Connection {
-  if (rpcUrl) return new Connection(rpcUrl, "confirmed");
-  return new Connection(fromChain === "solana" ? SOLANA_RPC : NARA_RPC, "confirmed");
+function getSolanaRpc(solanaRpc?: string): string {
+  return solanaRpc || DEFAULT_SOLANA_RPC;
 }
 
-function getDestConnection(toChain: BridgeChain): Connection {
-  return new Connection(toChain === "solana" ? SOLANA_RPC : NARA_RPC, "confirmed");
+function getSourceConnection(fromChain: BridgeChain, rpcUrl?: string, solanaRpc?: string): Connection {
+  if (fromChain === "nara") return new Connection(rpcUrl || NARA_RPC, "confirmed");
+  return new Connection(getSolanaRpc(solanaRpc), "confirmed");
+}
+
+function getDestConnection(toChain: BridgeChain, solanaRpc?: string): Connection {
+  if (toChain === "solana") return new Connection(getSolanaRpc(solanaRpc), "confirmed");
+  return new Connection(NARA_RPC, "confirmed");
 }
 
 // ─── Command: bridge transfer ────────────────────────────────────
@@ -39,7 +44,7 @@ function getDestConnection(toChain: BridgeChain): Connection {
 async function handleBridgeTransfer(
   token: string,
   amount: string,
-  options: GlobalOptions & { from: string; to?: string; recipient?: string }
+  options: GlobalOptions & { from: string; to?: string; recipient?: string; solanaRpc?: string }
 ) {
   const fromChain = options.from as BridgeChain;
   if (fromChain !== "solana" && fromChain !== "nara") {
@@ -64,7 +69,7 @@ async function handleBridgeTransfer(
   const rawAmount = BigInt(Math.floor(parseFloat(amount) * 10 ** decimals));
 
   const rpcUrl = fromChain === "nara" ? getRpcUrl(options.rpcUrl) : undefined;
-  const connection = getSourceConnection(fromChain, rpcUrl);
+  const connection = getSourceConnection(fromChain, rpcUrl, options.solanaRpc);
 
   // Check gas balance
   const gasBalance = await connection.getBalance(wallet.publicKey);
@@ -139,7 +144,7 @@ async function handleBridgeTransfer(
 
 async function handleBridgeStatus(
   id: string,
-  options: GlobalOptions & { from: string }
+  options: GlobalOptions & { from: string; solanaRpc?: string }
 ) {
   const fromChain = options.from as BridgeChain;
   if (fromChain !== "solana" && fromChain !== "nara") {
@@ -153,7 +158,7 @@ async function handleBridgeStatus(
   // If it doesn't look like a message ID (0x...), treat as tx signature
   if (!id.startsWith("0x")) {
     if (!options.json) printInfo("Extracting message ID from transaction...");
-    const sourceConn = getSourceConnection(fromChain, fromChain === "nara" ? getRpcUrl(options.rpcUrl) : undefined);
+    const sourceConn = getSourceConnection(fromChain, fromChain === "nara" ? getRpcUrl(options.rpcUrl) : undefined, options.solanaRpc);
     const extracted = await extractMessageId(sourceConn, id);
     if (!extracted) {
       printError("Could not extract message ID from transaction. It may not have been confirmed yet.");
@@ -165,7 +170,7 @@ async function handleBridgeStatus(
 
   // Query delivery status
   if (!options.json) printInfo("Checking delivery status...");
-  const destConn = getDestConnection(toChain);
+  const destConn = getDestConnection(toChain, options.solanaRpc);
   const status = await queryMessageStatus(destConn, messageId, toChain);
 
   // Query validator signatures
@@ -223,11 +228,18 @@ function handleBridgeTokens(options: GlobalOptions) {
 export function registerBridgeCommands(program: Command): void {
   const bridge = program
     .command("bridge")
-    .description("Cross-chain bridge between Solana and Nara (powered by Hyperlane, 0.5% fee)")
+    .description("Cross-chain bridge between Solana and Nara (powered by Hyperlane)")
     .addHelpText("after", `
+Solana and Nara use the same wallet address (Ed25519). To bridge from Solana,
+your wallet must have SOL on Solana mainnet for gas.
+Bridge fee: 0.5%.
+
 Examples:
   npx naracli bridge transfer USDC 10 --from solana     # Solana → Nara
-  npx naracli bridge transfer USDC 10 --from nara       # Nara → Solana`);
+  npx naracli bridge transfer USDC 10 --from nara       # Nara → Solana
+  npx naracli bridge transfer SOL 1 --from solana --solana-rpc https://my-rpc.com
+
+`);
 
   // bridge transfer
   bridge
@@ -235,10 +247,11 @@ Examples:
     .description("Bridge tokens between Solana and Nara (e.g. bridge transfer USDC 10 --from solana)")
     .requiredOption("--from <chain>", 'Source chain: "solana" or "nara"')
     .option("--recipient <address>", "Recipient address on destination chain (defaults to sender)")
+    .option("--solana-rpc <url>", "Solana RPC endpoint (default: https://api.mainnet-beta.solana.com)")
     .action(async (token: string, amount: string, opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
-        await handleBridgeTransfer(token, amount, { ...globalOpts, from: opts.from, recipient: opts.recipient });
+        await handleBridgeTransfer(token, amount, { ...globalOpts, from: opts.from, recipient: opts.recipient, solanaRpc: opts.solanaRpc });
       } catch (error: any) {
         printError(error.message);
         process.exit(1);
@@ -250,10 +263,11 @@ Examples:
     .command("status <tx-or-message-id>")
     .description("Check bridge transfer status by transaction signature or message ID")
     .requiredOption("--from <chain>", 'Source chain: "solana" or "nara"')
+    .option("--solana-rpc <url>", "Solana RPC endpoint (default: https://api.mainnet-beta.solana.com)")
     .action(async (id: string, opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
-        await handleBridgeStatus(id, { ...globalOpts, from: opts.from });
+        await handleBridgeStatus(id, { ...globalOpts, from: opts.from, solanaRpc: opts.solanaRpc });
       } catch (error: any) {
         printError(error.message);
         process.exit(1);

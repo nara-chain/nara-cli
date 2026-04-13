@@ -14,6 +14,7 @@ import { registerZkIdCommands } from "./commands/zkid";
 import { registerAgentCommands } from "./commands/agent";
 import { registerConfigCommands } from "./commands/config";
 import { registerBridgeCommands } from "./commands/bridge";
+import { registerDexCommands } from "./commands/dex";
 import {
   handleWalletAddress,
   handleWalletBalance,
@@ -82,6 +83,9 @@ export function registerCommands(program: Command): void {
 
   // bridge
   registerBridgeCommands(program);
+
+  // dex
+  registerDexCommands(program);
 
   // config
   registerConfigCommands(program);
@@ -175,13 +179,68 @@ export function registerCommands(program: Command): void {
 
   // Top-level: token-balance
   program
-    .command("token-balance <token-address>")
-    .description("Check token balance (supports SPL Token and Token-2022)")
+    .command("token-balance [token-address]")
+    .description("Check token balance. Without token-address, shows USDC, USDT, SOL balances.")
     .option("--owner <address>", "Owner address (optional, defaults to current wallet)")
-    .action(async (tokenAddress: string, options: { owner?: string }) => {
+    .action(async (tokenAddress: string | undefined, options: { owner?: string }) => {
       const opts = program.opts() as TokenBalanceOptions;
       try {
-        await handleTokenBalance(tokenAddress, { ...opts, ...options });
+        if (tokenAddress) {
+          await handleTokenBalance(tokenAddress, { ...opts, ...options });
+        } else {
+          // Show common token balances
+          const { Connection, PublicKey } = await import("@solana/web3.js");
+          const { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } = await import("@solana/spl-token");
+          const rpcUrl = getRpcUrl(opts.rpcUrl);
+          const connection = new Connection(rpcUrl, "confirmed");
+
+          let owner: PublicKey;
+          if (options.owner) {
+            owner = new PublicKey(options.owner);
+          } else {
+            const wallet = await loadWallet(opts.wallet);
+            owner = wallet.publicKey;
+          }
+
+          const tokens = [
+            { symbol: "USDC", mint: "8P7UGWjq86N3WUmwEgKeGHJZLcoMJqr5jnRUmeBN7YwR", program: TOKEN_2022_PROGRAM_ID, decimals: 6 },
+            { symbol: "USDT", mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", program: TOKEN_PROGRAM_ID, decimals: 6 },
+            { symbol: "SOL",  mint: "7fKh7DqPZmsYPHdGvt9Qw2rZkSEGp9F5dBa3XuuuhavU", program: TOKEN_2022_PROGRAM_ID, decimals: 9 },
+          ];
+
+          // Build all ATA addresses
+          const atas = await Promise.all(
+            tokens.map(t => getAssociatedTokenAddress(new PublicKey(t.mint), owner, true, t.program))
+          );
+
+          // Batch fetch with getMultipleAccountsInfo
+          const accounts = await connection.getMultipleAccountsInfo(atas);
+
+          const results = tokens.map((t, i) => {
+            const acc = accounts[i];
+            let balance = "0";
+            let amount = "0";
+            if (acc) {
+              try {
+                // Parse token account data: amount is at offset 64, 8 bytes LE
+                const raw = BigInt("0x" + Buffer.from(acc.data.slice(64, 72)).reverse().toString("hex"));
+                amount = raw.toString();
+                balance = (Number(raw) / 10 ** t.decimals).toString();
+              } catch {}
+            }
+            return { symbol: t.symbol, mint: t.mint, balance, amount };
+          });
+
+          if (opts.json) {
+            console.log(JSON.stringify({ owner: owner.toBase58(), tokens: results }, null, 2));
+          } else {
+            console.log(`\n  Owner: ${owner.toBase58()}\n`);
+            for (const r of results) {
+              console.log(`  ${r.mint}  ${r.symbol.padEnd(6)} ${r.balance}`);
+            }
+            console.log("");
+          }
+        }
       } catch (error: any) {
         printError(error.message);
         process.exit(1);
