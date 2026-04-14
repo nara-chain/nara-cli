@@ -107,16 +107,8 @@ async function handleQuestGet(options: GlobalOptions & { verbose?: boolean }) {
     return;
   }
 
-  // Stake is required once reward slots have reached maxRewardCount
-  let stakeRequired = true;
-  try {
-    const config = await getQuestConfig(connection);
-    if (quest.rewardCount < config.maxRewardCount) {
-      stakeRequired = false;
-    }
-  } catch {
-    // If config fetch fails, default to requiring stake
-  }
+  // Stake is always required to answer quests
+  const stakeRequired = true;
 
   // Fetch free credits (stake-free answer quota)
   let freeCredits = 0;
