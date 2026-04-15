@@ -205,19 +205,24 @@ async function handleBridgeStatus(
 
 function handleBridgeTokens(options: GlobalOptions) {
   const tokens = Object.values(BRIDGE_TOKENS) as any[];
+  const toUi = (n: bigint | undefined, d: number) => n ? Number(n) / 10 ** d : null;
   if (options.json) {
     formatOutput(tokens.map((t: any) => ({
       symbol: t.symbol,
       decimals: t.decimals,
-      minAmount: t.minAmount ? (Number(t.minAmount) / 10 ** t.decimals) : null,
+      minAmount: toUi(t.minAmount, t.decimals),
+      minFee: toUi(t.minFee, t.decimals),
       solanaMint: t.solana.mint?.toBase58() ?? "native",
       naraMint: t.nara.mint?.toBase58() ?? "native",
     })), true);
   } else {
     console.log("");
     for (const t of tokens) {
-      const minStr = t.minAmount ? `${Number(t.minAmount) / 10 ** t.decimals} ${t.symbol}` : "—";
-      console.log(`  ${t.symbol} (${t.decimals} decimals)  min: ${minStr}`);
+      const minAmt = toUi(t.minAmount, t.decimals);
+      const minFee = toUi(t.minFee, t.decimals);
+      const minAmtStr = minAmt !== null ? `${minAmt} ${t.symbol}` : "—";
+      const minFeeStr = minFee !== null ? `${minFee} ${t.symbol}` : "—";
+      console.log(`  ${t.symbol} (${t.decimals} decimals)  min: ${minAmtStr}  min fee: ${minFeeStr}`);
       console.log(`    Solana: ${t.solana.mint?.toBase58() ?? "native SOL"} (${t.solana.mode})`);
       console.log(`    Nara:   ${t.nara.mint?.toBase58() ?? "native NARA"} (${t.nara.mode})`);
     }
@@ -334,7 +339,7 @@ export function registerBridgeCommands(program: Command): void {
     .addHelpText("after", `
 1. Solana and Nara use the same wallet address (Ed25519). To bridge from Solana, your wallet must have SOL on Solana mainnet for gas.
 2. Delivery takes ~5-10 minutes (Hyperlane multi-validator signing).
-3. Bridge fee: 0.5%.
+3. Bridge fee: 0.5% of amount, with a per-token minimum fee floor (see "bridge tokens"). Each token also has a minimum bridgeable amount.
 
 Examples:
   npx naracli bridge transfer USDC 10 --from solana     # Solana → Nara

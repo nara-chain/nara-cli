@@ -76,7 +76,7 @@ zkid withdraw <name> [--recipient <addr>]           Withdraw deposit
 bridge transfer <token> <amount> --from <chain>      Bridge tokens between Solana and Nara
 bridge status <tx-or-message-id> --from <chain>     Check bridge transfer delivery status
 bridge info                                         Show bridgeable token balances on both chains
-bridge tokens                                       List supported bridge tokens (with minimum amounts)
+bridge tokens                                       List supported bridge tokens (shows min amount + min fee per token)
 dex pools [token-mint]                              Find Meteora pools containing a token (default: NARA)
 dex smart-quote <input> <output> <amount>           Best-route quote via smart router
 dex smart-swap <input> <output> <amount> [--slippage]   Execute best-route swap via smart router
