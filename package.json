@@ -1,6 +1,6 @@
 {
   "name": "naracli",
-  "version": "1.0.86",
+  "version": "1.0.87",
   "description": "CLI for the Nara chain (Solana-compatible)",
   "homepage": "https://nara.build",
   "repository": {
@@ -9,7 +9,6 @@
   },
   "module": "index.ts",
   "main": "index.ts",
-  "type": "module",
   "private": false,
   "bin": {
     "naracli": "./dist/naracli.cjs"
@@ -56,6 +55,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
     "@clack/prompts": "^1.0.1",
     "@meteora-ag/cp-amm-sdk": "^1.4.1",
     "@meteora-ag/dlmm": "^1.9.4",

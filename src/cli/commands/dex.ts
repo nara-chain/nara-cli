@@ -5,6 +5,7 @@
 import { Command } from "commander";
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import BN from "bn.js";
+import DLMM from "@meteora-ag/dlmm";
 import { loadWallet, getRpcUrl } from "../utils/wallet";
 import {
   printError,
@@ -28,6 +29,37 @@ function identifyPoolType(owner: string): PoolType | null {
   return null;
 }
 
+/** Get current point (slot or timestamp) without relying on RPC getBlockTime which can fail on recent slots. */
+async function getCurrentPointSafe(connection: Connection, activationType: number): Promise<BN> {
+  // activationType 0 = slot, 1 = timestamp
+  if (activationType === 1) {
+    return new BN(Math.floor(Date.now() / 1000));
+  }
+  const slot = await connection.getSlot();
+  return new BN(slot);
+}
+
+const KNOWN_TOKENS: Record<string, string> = {
+  "So11111111111111111111111111111111111111112": "NARA",
+  "8P7UGWjq86N3WUmwEgKeGHJZLcoMJqr5jnRUmeBN7YwR": "USDC",
+  "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB": "USDT",
+  "7fKh7DqPZmsYPHdGvt9Qw2rZkSEGp9F5dBa3XuuuhavU": "SOL",
+  "AqJX47z8UT6k6gFpJjzvcAAP4NJkfykW8U8za1evry7J": "POINT",
+};
+
+function tokenSymbol(mint: string): string {
+  return KNOWN_TOKENS[mint] ?? mint.slice(0, 4) + "..";
+}
+
+/** Resolve token symbol shortcut (e.g. "NARA") to mint address, or pass through if already a pubkey. */
+function resolveTokenMint(input: string): string {
+  const upper = input.toUpperCase();
+  for (const [mint, symbol] of Object.entries(KNOWN_TOKENS)) {
+    if (symbol === upper) return mint;
+  }
+  return input;
+}
+
 async function getMintDecimals(connection: Connection, mint: PublicKey): Promise<number> {
   try {
     const info = await connection.getParsedAccountInfo(mint);
@@ -35,6 +67,480 @@ async function getMintDecimals(connection: Connection, mint: PublicKey): Promise
     if (parsed?.info?.decimals !== undefined) return parsed.info.decimals;
   } catch {}
   return 9;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  POOLS (by token)
+// ═══════════════════════════════════════════════════════════════════
+
+// Account offsets for mint fields (8-byte discriminator included)
+const CPAMM_TOKENA_OFFSET = 168;
+const CPAMM_TOKENB_OFFSET = 200;
+const DLMM_TOKENX_OFFSET = 88;
+const DLMM_TOKENY_OFFSET = 120;
+const DLMM_LBPAIR_SIZE = 904;
+const DBC_BASEMINT_OFFSET = 136;
+
+async function findProgramAccountsByMint(
+  connection: Connection, programId: string, mint: PublicKey, offsets: number[]
+): Promise<PublicKey[]> {
+  const pubkeys = new Set<string>();
+  for (const offset of offsets) {
+    try {
+      const accounts = await connection.getProgramAccounts(new PublicKey(programId), {
+        filters: [{ memcmp: { offset, bytes: mint.toBase58() } }],
+        dataSlice: { offset: 0, length: 0 },
+      });
+      for (const a of accounts) pubkeys.add(a.pubkey.toBase58());
+    } catch {}
+  }
+  return Array.from(pubkeys).map(s => new PublicKey(s));
+}
+
+async function findDlmmPoolsByMint(connection: Connection, mint: PublicKey): Promise<PublicKey[]> {
+  const pubkeys = new Set<string>();
+  for (const offset of [DLMM_TOKENX_OFFSET, DLMM_TOKENY_OFFSET]) {
+    try {
+      const accounts = await connection.getProgramAccounts(new PublicKey(DLMM_PROGRAM_ID), {
+        filters: [
+          { dataSize: DLMM_LBPAIR_SIZE },
+          { memcmp: { offset, bytes: mint.toBase58() } },
+        ],
+        dataSlice: { offset: 0, length: 0 },
+      });
+      for (const a of accounts) pubkeys.add(a.pubkey.toBase58());
+    } catch {}
+  }
+  return Array.from(pubkeys).map(s => new PublicKey(s));
+}
+
+async function handlePools(token: string, options: GlobalOptions) {
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const connection = new Connection(rpcUrl, "confirmed");
+  const tokenMint = new PublicKey(token);
+  const tokenDecimals = await getMintDecimals(connection, tokenMint);
+
+  if (!options.json) printInfo(`Searching pools containing ${token}...`);
+
+  // Find pool addresses for each pool type via memcmp filters
+  const [cpammAddrs, dlmmAddrs, dbcAddrs] = await Promise.all([
+    findProgramAccountsByMint(connection, CPAMM_PROGRAM_ID, tokenMint, [CPAMM_TOKENA_OFFSET, CPAMM_TOKENB_OFFSET]),
+    findDlmmPoolsByMint(connection, tokenMint),
+    findProgramAccountsByMint(connection, DBC_PROGRAM_ID, tokenMint, [DBC_BASEMINT_OFFSET]),
+  ]);
+
+  const results: any[] = [];
+
+  // Decode CPAMM pools
+  if (cpammAddrs.length > 0) {
+    try {
+      const { CpAmm, getReservesAmountForConcentratedLiquidity } = await import("@meteora-ag/cp-amm-sdk");
+      const cpAmm = new CpAmm(connection);
+      for (const addr of cpammAddrs) {
+        try {
+          const state = await cpAmm.fetchPoolState(addr);
+          const decA = await getMintDecimals(connection, state.tokenAMint);
+          const decB = await getMintDecimals(connection, state.tokenBMint);
+          const [resA, resB] = getReservesAmountForConcentratedLiquidity(
+            state.sqrtPrice, state.sqrtMinPrice, state.sqrtMaxPrice, state.liquidity
+          );
+          const amountA = Number(resA.toString()) / 10 ** decA;
+          const amountB = Number(resB.toString()) / 10 ** decB;
+          // price = (sqrtPrice / 2^64)^2 * 10^(decA - decB) = B per A
+          const sqrtNum = Number(state.sqrtPrice.toString()) / 2 ** 64;
+          const priceBA = sqrtNum * sqrtNum * 10 ** (decA - decB);
+
+          results.push({
+            type: "DAMM v2",
+            pool: addr.toBase58(),
+            tokenA: state.tokenAMint.toBase58(),
+            tokenB: state.tokenBMint.toBase58(),
+            amountA, amountB,
+            price: priceBA,
+          });
+        } catch {}
+      }
+    } catch {}
+  }
+
+  // Decode DLMM pools
+  if (dlmmAddrs.length > 0) {
+    try {
+      const { default: DLMM } = await import("@meteora-ag/dlmm");
+      const dlmms = await DLMM.createMultiple(connection, dlmmAddrs);
+      for (const dlmm of dlmms) {
+        try {
+          const activeBin = await dlmm.getActiveBin();
+          const reserves = await Promise.all([
+            connection.getTokenAccountBalance(dlmm.tokenX.reserve).catch(() => null),
+            connection.getTokenAccountBalance(dlmm.tokenY.reserve).catch(() => null),
+          ]);
+          const amountX = reserves[0] ? Number(reserves[0].value.uiAmount ?? 0) : 0;
+          const amountY = reserves[1] ? Number(reserves[1].value.uiAmount ?? 0) : 0;
+          results.push({
+            type: "DLMM",
+            pool: dlmm.pubkey.toBase58(),
+            tokenA: dlmm.tokenX.publicKey.toBase58(),
+            tokenB: dlmm.tokenY.publicKey.toBase58(),
+            amountA: amountX,
+            amountB: amountY,
+            price: Number(activeBin.price),
+          });
+        } catch {}
+      }
+    } catch {}
+  }
+
+  // Decode DBC pools
+  if (dbcAddrs.length > 0) {
+    try {
+      const { DynamicBondingCurveClient } = await import("@meteora-ag/dynamic-bonding-curve-sdk");
+      const client = DynamicBondingCurveClient.create(connection);
+      for (const addr of dbcAddrs) {
+        try {
+          const pool = await client.pool.getPool(addr);
+          const config = await client.pool.getPoolConfig(pool.config);
+          const decBase = await getMintDecimals(connection, pool.baseMint);
+          const decQuote = await getMintDecimals(connection, pool.quoteMint);
+
+          const baseBal = await connection.getTokenAccountBalance(pool.baseVault).catch(() => null);
+          const quoteBal = await connection.getTokenAccountBalance(pool.quoteVault).catch(() => null);
+          const amountBase = baseBal ? Number(baseBal.value.uiAmount ?? 0) : 0;
+          const amountQuote = quoteBal ? Number(quoteBal.value.uiAmount ?? 0) : 0;
+
+          // sqrtPrice Q64 → price = (sqrtPrice / 2^64)^2 * 10^(decBase - decQuote)
+          const sqrtNum = Number(pool.sqrtPrice?.toString() ?? "0") / 2 ** 64;
+          const price = sqrtNum * sqrtNum * 10 ** (decBase - decQuote);
+
+          results.push({
+            type: "DBC",
+            pool: addr.toBase58(),
+            tokenA: pool.baseMint.toBase58(),
+            tokenB: pool.quoteMint.toBase58(),
+            amountA: amountBase,
+            amountB: amountQuote,
+            price,
+          });
+        } catch {}
+      }
+    } catch {}
+  }
+
+  if (options.json) {
+    formatOutput(results, true);
+  } else {
+    if (results.length === 0) {
+      printInfo("No pools found for this token.");
+      return;
+    }
+    console.log("");
+    for (const r of results) {
+      const symA = tokenSymbol(r.tokenA);
+      const symB = tokenSymbol(r.tokenB);
+      console.log(`  [${r.type}] ${symA}/${symB} ${r.pool}`);
+      console.log(`    ${symA}: ${r.tokenA}`);
+      console.log(`    ${symB}: ${r.tokenB}`);
+      console.log(`    Reserves: ${r.amountA.toFixed(4)} ${symA} / ${r.amountB.toFixed(4)} ${symB}`);
+      console.log(`    Price: 1 ${symA} = ${r.price.toFixed(6)} ${symB}`);
+      console.log("");
+    }
+    console.log(`  Total: ${results.length} pool(s)`);
+    console.log("");
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  SMART ROUTER (via https://smart-router.nara.build/)
+// ═══════════════════════════════════════════════════════════════════
+
+const SMART_ROUTER_URL = process.env.SMART_ROUTER_URL || "https://smart-router.nara.build";
+
+async function handleSmartQuote(
+  inputToken: string, outputToken: string, amount: string,
+  options: GlobalOptions
+) {
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const connection = new Connection(rpcUrl, "confirmed");
+  const inputMint = new PublicKey(resolveTokenMint(inputToken));
+  const outputMint = new PublicKey(resolveTokenMint(outputToken));
+  const inputDecimals = await getMintDecimals(connection, inputMint);
+  const outputDecimals = await getMintDecimals(connection, outputMint);
+  const rawAmount = BigInt(Math.floor(parseFloat(amount) * 10 ** inputDecimals));
+
+  if (!options.json) printInfo("Fetching quote from smart router...");
+  const url = `${SMART_ROUTER_URL}/quote?input_mint=${inputMint.toBase58()}&output_mint=${outputMint.toBase58()}&amount_in=${rawAmount}`;
+  const res = await fetch(url);
+  const data = await res.json() as any;
+  if (!res.ok || data.error) {
+    printError(`Smart router: ${data.error ?? res.status}`);
+    process.exit(1);
+  }
+
+  const amountInNum = Number(data.amount_in) / 10 ** inputDecimals;
+  const amountOutNum = Number(data.amount_out) / 10 ** outputDecimals;
+  const minOutNum = Number(data.min_amount_out) / 10 ** outputDecimals;
+  const price = amountInNum > 0 ? amountOutNum / amountInNum : 0;
+
+  if (options.json) {
+    formatOutput(data, true);
+  } else {
+    const symIn = tokenSymbol(inputMint.toBase58());
+    const symOut = tokenSymbol(outputMint.toBase58());
+    console.log("");
+    console.log(`  Input:       ${amountInNum} ${symIn}`);
+    console.log(`  Output:      ${amountOutNum.toFixed(outputDecimals)} ${symOut}`);
+    console.log(`  Min output:  ${minOutNum.toFixed(outputDecimals)} ${symOut}`);
+    console.log(`  Price:       1 ${symIn} = ${price.toFixed(6)} ${symOut}`);
+    if (Array.isArray(data.route_legs) && data.route_legs.length > 0) {
+      console.log(`  Route:`);
+      for (const leg of data.route_legs) {
+        for (const hop of leg.path ?? []) {
+          const symHopIn = tokenSymbol(hop.token_in);
+          const symHopOut = tokenSymbol(hop.token_out);
+          console.log(`    ${symHopIn} → ${symHopOut}  [${hop.pool_type}] ${hop.pool_id}`);
+        }
+      }
+    }
+    console.log("");
+  }
+}
+
+async function handleSmartSwap(
+  inputToken: string, outputToken: string, amount: string,
+  options: GlobalOptions & { slippage?: string }
+) {
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const connection = new Connection(rpcUrl, "confirmed");
+  const wallet = await loadWallet(options.wallet);
+  const inputMint = new PublicKey(resolveTokenMint(inputToken));
+  const outputMint = new PublicKey(resolveTokenMint(outputToken));
+  const inputDecimals = await getMintDecimals(connection, inputMint);
+  const outputDecimals = await getMintDecimals(connection, outputMint);
+  const rawAmount = BigInt(Math.floor(parseFloat(amount) * 10 ** inputDecimals));
+  const slippageBps = options.slippage ? Math.round(parseFloat(options.slippage) * 100) : 100;
+
+  const symIn = tokenSymbol(inputMint.toBase58());
+  const symOut = tokenSymbol(outputMint.toBase58());
+
+  if (!options.json) printInfo(`Creating order: ${amount} ${symIn} → ${symOut} (slippage ${slippageBps / 100}%)...`);
+  const orderRes = await fetch(`${SMART_ROUTER_URL}/order`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      input_mint: inputMint.toBase58(),
+      output_mint: outputMint.toBase58(),
+      amount_in: Number(rawAmount),
+      slippage_bps: slippageBps,
+      user_pubkey: wallet.publicKey.toBase58(),
+    }),
+  });
+  const order = await orderRes.json() as any;
+  if (!orderRes.ok || order.error) {
+    printError(`Order failed: ${order.error ?? orderRes.status}`);
+    process.exit(1);
+  }
+
+  if (!options.json) {
+    const amountOutNum = Number(order.amount_out) / 10 ** outputDecimals;
+    const minOutNum = Number(order.min_amount_out) / 10 ** outputDecimals;
+    console.log(`  Expected out: ${amountOutNum.toFixed(outputDecimals)} ${symOut}`);
+    console.log(`  Min out:      ${minOutNum.toFixed(outputDecimals)} ${symOut}`);
+    console.log(`  Order ID:     ${order.order_id}`);
+    printInfo("Signing and submitting...");
+  }
+
+  // Sign tx (supports both versioned and legacy)
+  const { VersionedTransaction, Transaction } = await import("@solana/web3.js");
+  const txBuf = Buffer.from(order.unsigned_tx_base64, "base64");
+  let signedB64: string;
+  try {
+    const vtx = VersionedTransaction.deserialize(new Uint8Array(txBuf));
+    vtx.sign([wallet]);
+    signedB64 = Buffer.from(vtx.serialize()).toString("base64");
+  } catch {
+    const ltx = Transaction.from(txBuf);
+    ltx.sign(wallet);
+    signedB64 = ltx.serialize().toString("base64");
+  }
+
+  const execRes = await fetch(`${SMART_ROUTER_URL}/execute`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ order_id: order.order_id, signed_tx_base64: signedB64 }),
+  });
+  const exec = await execRes.json() as any;
+  if (!execRes.ok || exec.error) {
+    printError(`Execute failed: ${exec.error ?? execRes.status}`);
+    process.exit(1);
+  }
+
+  if (options.json) {
+    formatOutput({ order, exec }, true);
+  } else {
+    printSuccess(`Swap ${exec.confirmed ? "confirmed" : "submitted"}!`);
+    console.log(`  Transaction: ${exec.signature}`);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  QUOTE
+// ═══════════════════════════════════════════════════════════════════
+
+async function handleQuote(
+  pool: string, inputToken: string, amount: string,
+  options: GlobalOptions & { slippage?: string }
+) {
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const connection = new Connection(rpcUrl, "confirmed");
+  const poolAddress = new PublicKey(pool);
+  const inputMint = new PublicKey(resolveTokenMint(inputToken));
+  const slippageBps = options.slippage ? Math.round(parseFloat(options.slippage) * 100) : 100;
+
+  // Detect pool type
+  if (!options.json) printInfo("Detecting pool type...");
+  const accountInfo = await connection.getAccountInfo(poolAddress);
+  if (!accountInfo) { printError("Pool account not found"); process.exit(1); }
+
+  const poolType = identifyPoolType(accountInfo.owner.toBase58());
+  if (!poolType) {
+    printError(`Unrecognized pool. Owner: ${accountInfo.owner.toBase58()}. Supported: DAMM v2, DLMM, DBC`);
+    process.exit(1);
+  }
+  if (!options.json) printInfo(`Pool type: ${poolType.toUpperCase()}`);
+
+  const inputDecimals = await getMintDecimals(connection, inputMint);
+  const rawAmount = new BN(Math.floor(parseFloat(amount) * 10 ** inputDecimals).toString());
+
+  let outputMint: PublicKey;
+  let amountOut: BN;
+  let minOut: BN;
+  let fee: BN;
+  let outputDecimals = 9;
+
+  let feeBps: number | null = null;
+
+  if (poolType === "cpamm") {
+    const {
+      CpAmm, swapQuoteExactInput,
+      getBaseFeeHandlerFromPodAlignedData, feeNumeratorToBps,
+    } = await import("@meteora-ag/cp-amm-sdk");
+    const cpAmm = new CpAmm(connection);
+    const poolState = await cpAmm.fetchPoolState(poolAddress);
+
+    // Decode pool fee from poolFees.baseFee
+    try {
+      const rawData = (poolState.poolFees as any)?.baseFee?.baseFeeInfo?.data;
+      if (rawData) {
+        let bytes: number[];
+        if (Array.isArray(rawData)) bytes = rawData;
+        else if (rawData instanceof Uint8Array) bytes = Array.from(rawData);
+        else if ((rawData as any)?.data && Array.isArray((rawData as any).data)) bytes = (rawData as any).data;
+        else bytes = Array.from(Buffer.from(rawData));
+        const handler = getBaseFeeHandlerFromPodAlignedData(bytes);
+        feeBps = Number(feeNumeratorToBps(handler.getMinFeeNumerator()));
+      }
+    } catch {}
+    const aToB = inputMint.equals(poolState.tokenAMint);
+    if (!aToB && !inputMint.equals(poolState.tokenBMint)) {
+      printError(`Input token not in pool`); process.exit(1);
+    }
+    outputMint = aToB ? poolState.tokenBMint : poolState.tokenAMint;
+    outputDecimals = await getMintDecimals(connection, outputMint);
+
+    const currentPoint = await getCurrentPointSafe(connection, poolState.activationType);
+    const quote = swapQuoteExactInput(
+      poolState, currentPoint, rawAmount,
+      slippageBps, aToB, false,
+      inputDecimals, outputDecimals,
+    );
+    const q = quote as any;
+    amountOut = new BN(q.outputAmount?.toString() ?? "0");
+    minOut = q.minimumAmountOut ?? new BN(0);
+    // Sum LP/protocol/referral fees (all in input token lamports)
+    fee = new BN((q.claimingFee ?? "0").toString())
+      .add(new BN((q.protocolFee ?? "0").toString()))
+      .add(new BN((q.compoundingFee ?? "0").toString()))
+      .add(new BN((q.referralFee ?? "0").toString()));
+  } else if (poolType === "dlmm") {
+    const { default: DLMM } = await import("@meteora-ag/dlmm");
+    const dlmm = await DLMM.create(connection, poolAddress);
+    const swapForY = inputMint.equals(dlmm.tokenX.publicKey);
+    if (!swapForY && !inputMint.equals(dlmm.tokenY.publicKey)) {
+      printError(`Input token not in pool`); process.exit(1);
+    }
+    outputMint = swapForY ? dlmm.tokenY.publicKey : dlmm.tokenX.publicKey;
+    outputDecimals = await getMintDecimals(connection, outputMint);
+
+    const binArrays = await dlmm.getBinArrayForSwap(swapForY);
+    const quote = dlmm.swapQuote(rawAmount, swapForY, new BN(slippageBps), binArrays);
+    amountOut = quote.outAmount;
+    minOut = quote.minOutAmount;
+    fee = quote.fee;
+    // Compute DLMM fee bps from baseFactor + binStep + baseFeePowerFactor
+    try {
+      const params = (dlmm.lbPair as any).parameters;
+      const baseFactor = Number(params?.baseFactor ?? 0);
+      const binStep = Number((dlmm.lbPair as any).binStep ?? 0);
+      const pf = Number(params?.baseFeePowerFactor ?? 0);
+      if (baseFactor > 0 && binStep > 0) {
+        const fi: any = (DLMM as any).calculateFeeInfo(baseFactor, binStep, pf);
+        feeBps = Number(fi.baseFeeRatePercentage) * 100; // percent → bps
+      }
+    } catch {}
+  } else {
+    // DBC
+    const { DynamicBondingCurveClient } = await import("@meteora-ag/dynamic-bonding-curve-sdk");
+    const client = DynamicBondingCurveClient.create(connection);
+    const p = await client.pool.getPool(poolAddress);
+    const swapBaseForQuote = inputMint.equals(p.baseMint);
+    if (!swapBaseForQuote && !inputMint.equals(p.quoteMint)) {
+      printError(`Input token not in pool`); process.exit(1);
+    }
+    outputMint = swapBaseForQuote ? p.quoteMint : p.baseMint;
+    outputDecimals = await getMintDecimals(connection, outputMint);
+
+    const config = await client.pool.getPoolConfig(p.config);
+    const quote = client.pool.swapQuote({
+      virtualPool: p, config, swapBaseForQuote,
+      amountIn: rawAmount, slippageBps, hasReferral: false,
+      currentPoint: p.currentPoint,
+    });
+    amountOut = new BN((quote.outputAmount ?? quote.amountOut ?? "0").toString());
+    minOut = quote.minimumAmountOut ?? new BN(0);
+    fee = new BN((quote.fee ?? quote.totalFee ?? "0").toString());
+  }
+
+  const amountInNum = Number(rawAmount.toString()) / 10 ** inputDecimals;
+  const amountOutNum = Number(amountOut.toString()) / 10 ** outputDecimals;
+  const minOutNum = Number(minOut.toString()) / 10 ** outputDecimals;
+  // If feeBps known, compute fee from input; otherwise fallback to SDK-reported fee
+  const feeNum = feeBps !== null ? amountInNum * (feeBps / 10000) : Number(fee.toString()) / 10 ** inputDecimals;
+  const price = amountInNum > 0 ? amountOutNum / amountInNum : 0;
+
+  if (options.json) {
+    formatOutput({
+      poolType, inputMint: inputMint.toBase58(), outputMint: outputMint.toBase58(),
+      amountIn: amountInNum, amountOut: amountOutNum,
+      minOut: minOutNum, fee: feeNum, feeBps, price,
+      slippageBps,
+    }, true);
+  } else {
+    console.log("");
+    const symIn = tokenSymbol(inputMint.toBase58());
+    const symOut = tokenSymbol(outputMint.toBase58());
+    console.log(`  Pool type:   ${poolType.toUpperCase()}`);
+    console.log(`  Input:       ${amountInNum} ${symIn} (${inputMint.toBase58()})`);
+    console.log(`  Output:      ${amountOutNum.toFixed(outputDecimals)} ${symOut} (${outputMint.toBase58()})`);
+    console.log(`  Min output:  ${minOutNum.toFixed(outputDecimals)} ${symOut} (@ ${slippageBps / 100}% slippage)`);
+    if (feeBps !== null) {
+      console.log(`  Fee:         ${(feeBps / 100).toFixed(2)}%`);
+    } else {
+      const feeStr = feeNum.toFixed(inputDecimals).replace(/\.?0+$/, "");
+      console.log(`  Fee:         ${feeStr} ${symIn}`);
+    }
+    console.log(`  Price:       1 ${symIn} = ${price.toFixed(6)} ${symOut}`);
+    console.log("");
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -49,7 +555,7 @@ async function swapCpAmm(
   amountIn: BN,
   slippageBps: number,
 ) {
-  const { CpAmm, SwapMode } = await import("@meteora-ag/cp-amm-sdk");
+  const { CpAmm, SwapMode, swapQuoteExactInput } = await import("@meteora-ag/cp-amm-sdk");
   const cpAmm = new CpAmm(connection);
   const poolState = await cpAmm.fetchPoolState(poolAddress);
 
@@ -60,26 +566,33 @@ async function swapCpAmm(
     throw new Error(`Input token ${inputMint.toBase58()} not in pool (A: ${tokenAMint.toBase58()}, B: ${tokenBMint.toBase58()})`);
   }
 
-  const quote = cpAmm.swapQuoteExactInput(
-    poolState, poolState.currentPoint, amountIn,
-    slippageBps / 10000, aToB, false,
-    poolState.tokenADecimals ?? 9, poolState.tokenBDecimals ?? 9,
+  const decA = await getMintDecimals(connection, tokenAMint);
+  const decB = await getMintDecimals(connection, tokenBMint);
+  const currentPoint = await getCurrentPointSafe(connection, poolState.activationType);
+  const quote = swapQuoteExactInput(
+    poolState, currentPoint, amountIn,
+    slippageBps / 10000, aToB, false, decA, decB,
   );
 
   const outputMint = aToB ? tokenBMint : tokenAMint;
-  const minOut = quote.minimumAmountOut ?? new BN(0);
+  const minOut = (quote as any).minimumAmountOut ?? new BN(0);
+
+  // Get token program for each mint (SPL Token or Token-2022)
+  const [mintAInfo, mintBInfo] = await connection.getMultipleAccountsInfo([tokenAMint, tokenBMint]);
+  const tokenAProgram = mintAInfo!.owner;
+  const tokenBProgram = mintBInfo!.owner;
 
   const txBuilder = cpAmm.swap2({
     payer: wallet.publicKey, pool: poolAddress,
     inputTokenMint: inputMint, outputTokenMint: outputMint,
     tokenAMint, tokenBMint,
     tokenAVault: poolState.tokenAVault, tokenBVault: poolState.tokenBVault,
-    tokenAProgram: poolState.tokenAProgram, tokenBProgram: poolState.tokenBProgram,
+    tokenAProgram, tokenBProgram,
     referralTokenAccount: null, poolState,
     swapMode: SwapMode.ExactIn, amountIn, minimumAmountOut: minOut,
   });
 
-  const tx = await txBuilder.transaction();
+  const tx = await txBuilder;
   tx.feePayer = wallet.publicKey;
   tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
   tx.sign(wallet);
@@ -173,7 +686,7 @@ async function handleSwap(
   const connection = new Connection(rpcUrl, "confirmed");
   const wallet = await loadWallet(options.wallet);
   const poolAddress = new PublicKey(pool);
-  const inputMint = new PublicKey(inputToken);
+  const inputMint = new PublicKey(resolveTokenMint(inputToken));
   const slippageBps = options.slippage ? Math.round(parseFloat(options.slippage) * 100) : 100;
 
   // Detect pool type
@@ -191,7 +704,8 @@ async function handleSwap(
   const decimals = await getMintDecimals(connection, inputMint);
   const rawAmount = new BN(Math.floor(parseFloat(amount) * 10 ** decimals).toString());
 
-  if (!options.json) printInfo(`Swapping ${amount} tokens (slippage: ${slippageBps / 100}%)...`);
+  const symIn = tokenSymbol(inputMint.toBase58());
+  if (!options.json) printInfo(`Swapping ${amount} ${symIn} (slippage: ${slippageBps / 100}%)...`);
 
   let result: { signature: string; outputMint: PublicKey; minOut: BN };
   switch (poolType) {
@@ -203,10 +717,13 @@ async function handleSwap(
   if (options.json) {
     formatOutput({ signature: result.signature, poolType, inputMint: inputMint.toBase58(), outputMint: result.outputMint.toBase58(), amountIn: amount, minAmountOut: result.minOut.toString() }, true);
   } else {
+    const symOut = tokenSymbol(result.outputMint.toBase58());
+    const outDec = await getMintDecimals(connection, result.outputMint);
+    const minOutStr = (Number(result.minOut.toString()) / 10 ** outDec).toFixed(outDec).replace(/\.?0+$/, "");
     printSuccess("Swap submitted!");
     console.log(`  Transaction: ${result.signature}`);
-    console.log(`  Output mint: ${result.outputMint.toBase58()}`);
-    console.log(`  Min output: ${result.minOut.toString()}`);
+    console.log(`  Output: ${symOut} (${result.outputMint.toBase58()})`);
+    console.log(`  Min output: ${minOutStr} ${symOut}`);
   }
 }
 
@@ -222,7 +739,7 @@ async function handleAddLiquidity(
   const connection = new Connection(rpcUrl, "confirmed");
   const wallet = await loadWallet(options.wallet);
   const poolAddress = new PublicKey(pool);
-  const inputMint = new PublicKey(inputToken);
+  const inputMint = new PublicKey(resolveTokenMint(inputToken));
   const slippageBps = options.slippage ? Math.round(parseFloat(options.slippage) * 100) : 100;
 
   // Detect pool type
@@ -332,7 +849,7 @@ async function handleAddLiquidity(
         tokenAProgram: poolState.tokenAProgram, tokenBProgram: poolState.tokenBProgram,
       });
 
-      const tx = await txBuilder.transaction();
+      const tx = await txBuilder;
       tx.feePayer = wallet.publicKey;
       tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
       tx.sign(wallet);
@@ -352,7 +869,7 @@ async function handleAddLiquidity(
         poolState,
       });
 
-      const tx = await txBuilder.transaction();
+      const tx = await txBuilder;
       tx.feePayer = wallet.publicKey;
       tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
       tx.sign(wallet, positionNft);
@@ -556,7 +1073,7 @@ async function handleCreateCpAmm(
       tokenAProgram, tokenBProgram,
     });
 
-    const tx = await txBuilder.transaction();
+    const tx = await txBuilder;
     tx.feePayer = wallet.publicKey;
     tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
     tx.sign(wallet, positionNft);
@@ -844,7 +1361,7 @@ async function handleRemoveLiquidity(
       txBuilder = cpAmm.removeLiquidity({ ...commonParams, liquidityDelta });
     }
 
-    const tx = await txBuilder.transaction();
+    const tx = await txBuilder;
     tx.feePayer = wallet.publicKey;
     tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
     tx.sign(wallet);
@@ -936,7 +1453,7 @@ async function handleClaimFee(
       receiver: wallet.publicKey,
     });
 
-    const tx = await txBuilder.transaction();
+    const tx = await txBuilder;
     tx.feePayer = wallet.publicKey;
     tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
     tx.sign(wallet);
@@ -977,8 +1494,84 @@ async function handleClaimFee(
 
 export function registerDexCommands(program: Command): void {
   const dex = program
-    .command("dex", { hidden: true })
-    .description("DEX operations — swap tokens and create pools on Meteora (DAMM v2 / DLMM / DBC)");
+    .command("dex")
+    .description("DEX — swap tokens via smart router or specific Meteora pool (DAMM v2 / DLMM / DBC)")
+    .addHelpText("after", `
+Token symbols (NARA, USDC, USDT, SOL) can be used instead of mint addresses.
+
+Examples:
+  # Discover pools
+  npx naracli dex pools                         # List NARA pools (default)
+  npx naracli dex pools USDC                    # List USDC pools
+
+  # Smart routing (best price across DAMM v2 / DLMM / DBC)
+  npx naracli dex smart-quote NARA USDC 1       # Quote: sell 1 NARA for USDC
+  npx naracli dex smart-quote USDC NARA 10      # Quote: buy NARA with 10 USDC
+  npx naracli dex smart-swap NARA USDC 1 --slippage 0.5  # Execute: sell 1 NARA → USDC
+  npx naracli dex smart-swap USDC NARA 10                # Execute: buy NARA with 10 USDC
+
+  # Single-pool quote / swap
+  npx naracli dex quote <pool-address> NARA 1   # Quote on a specific pool
+  npx naracli dex swap <pool-address> NARA 1 --slippage 0.5`);
+
+  // dex pools
+  dex
+    .command("pools [token-mint]")
+    .description("Find Meteora pools containing a given token (default: NARA), show reserves and price")
+    .action(async (token: string | undefined, _opts: any, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        const mint = token || "So11111111111111111111111111111111111111112";
+        await handlePools(mint, globalOpts);
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // dex smart-quote
+  dex
+    .command("smart-quote <input-mint> <output-mint> <amount>")
+    .description("Get a best-route swap quote via nara smart router (aggregates DAMM v2 / DLMM / DBC)")
+    .action(async (inputToken: string, outputToken: string, amount: string, _opts: any, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleSmartQuote(inputToken, outputToken, amount, globalOpts);
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // dex smart-swap
+  dex
+    .command("smart-swap <input-mint> <output-mint> <amount>")
+    .description("Execute a best-route swap via nara smart router")
+    .option("--slippage <percent>", "Slippage tolerance in percent (default: 1)")
+    .action(async (inputToken: string, outputToken: string, amount: string, opts: any, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleSmartSwap(inputToken, outputToken, amount, { ...globalOpts, slippage: opts.slippage });
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // dex quote
+  dex
+    .command("quote <pool> <input-token-mint> <amount>")
+    .description("Get a swap quote without executing (shows expected output, min output, fee, price)")
+    .option("--slippage <percent>", "Slippage tolerance in percent (default: 1)")
+    .action(async (pool: string, inputToken: string, amount: string, opts: any, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleQuote(pool, inputToken, amount, { ...globalOpts, slippage: opts.slippage });
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
 
   // dex swap
   dex
@@ -1001,7 +1594,7 @@ Examples:
 
   // dex add-liquidity
   dex
-    .command("add-liquidity <pool> <token-mint> <amount>")
+    .command("liquidity-add <pool> <token-mint> <amount>", { hidden: true })
     .description("Add liquidity to a Meteora pool (DAMM v2 / DLMM). Calculates the paired token amount from pool price.")
     .option("--amount-b <number>", "Explicitly set paired token amount (skip price calculation)")
     .option("--position <address>", "Existing position address (creates new if omitted)")
@@ -1022,7 +1615,7 @@ Examples:
 
   // dex liquidity-positions
   dex
-    .command("liquidity-positions [owner-address]")
+    .command("liquidity-positions [owner-address]", { hidden: true })
     .description("List all liquidity positions across DAMM v2 and DLMM pools. Defaults to your wallet.")
     .action(async (ownerAddress: string | undefined, _opts: any, cmd: Command) => {
       try {
@@ -1036,7 +1629,7 @@ Examples:
 
   // dex remove-liquidity
   dex
-    .command("remove-liquidity <pool> <position>")
+    .command("liquidity-remove <pool> <position>", { hidden: true })
     .description("Remove liquidity from a Meteora pool position (DAMM v2 / DLMM)")
     .option("--bps <number>", "Basis points to remove (10000 = 100%, default: 10000)")
     .option("--all", "Remove all liquidity and close position")
@@ -1052,7 +1645,7 @@ Examples:
 
   // dex claim-fee
   dex
-    .command("claim-fee <pool> <position>")
+    .command("claim-fee <pool> <position>", { hidden: true })
     .description("Claim accumulated trading fees from a position (DAMM v2 / DLMM)")
     .action(async (pool: string, position: string, _opts: any, cmd: Command) => {
       try {
@@ -1066,7 +1659,7 @@ Examples:
 
   // dex create-pool
   const createPool = dex
-    .command("create-pool")
+    .command("create-pool", { hidden: true })
     .description("Create a new liquidity pool on Meteora");
 
   // dex create-pool cpamm

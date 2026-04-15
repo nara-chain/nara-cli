@@ -11,6 +11,9 @@ importers:
       '@clack/prompts':
         specifier: ^1.0.1
         version: 1.1.0
+      '@coral-xyz/anchor':
+        specifier: ^0.32.1
+        version: 0.32.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
       '@meteora-ag/cp-amm-sdk':
         specifier: ^1.4.1
         version: 1.4.1(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6)
