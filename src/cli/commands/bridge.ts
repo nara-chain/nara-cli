@@ -209,13 +209,15 @@ function handleBridgeTokens(options: GlobalOptions) {
     formatOutput(tokens.map((t: any) => ({
       symbol: t.symbol,
       decimals: t.decimals,
+      minAmount: t.minAmount ? (Number(t.minAmount) / 10 ** t.decimals) : null,
       solanaMint: t.solana.mint?.toBase58() ?? "native",
       naraMint: t.nara.mint?.toBase58() ?? "native",
     })), true);
   } else {
     console.log("");
     for (const t of tokens) {
-      console.log(`  ${t.symbol} (${t.decimals} decimals)`);
+      const minStr = t.minAmount ? `${Number(t.minAmount) / 10 ** t.decimals} ${t.symbol}` : "—";
+      console.log(`  ${t.symbol} (${t.decimals} decimals)  min: ${minStr}`);
       console.log(`    Solana: ${t.solana.mint?.toBase58() ?? "native SOL"} (${t.solana.mode})`);
       console.log(`    Nara:   ${t.nara.mint?.toBase58() ?? "native NARA"} (${t.nara.mode})`);
     }
