@@ -45,8 +45,8 @@ importers:
         specifier: ^1.3.0
         version: 1.3.0
       nara-sdk:
-        specifier: ^1.0.78
-        version: 1.0.78(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6)
+        specifier: ^1.0.81
+        version: 1.0.81(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6)
       picocolors:
         specifier: ^1.1.1
         version: 1.1.1
@@ -1169,8 +1169,8 @@ packages:
   nanoassert@2.0.0:
     resolution: {integrity: sha512-7vO7n28+aYO4J+8w96AzhmU8G+Y/xpPDJz/se19ICsqj/momRbb9mh9ZUtkoJ5X3nTnPdhEJyc0qnM6yAsHBaA==}
 
-  nara-sdk@1.0.78:
-    resolution: {integrity: sha512-5LR8xJYSAWwjFAnA4Coz/eviBBEG6czWFj/UnLrPRyVwh3PlqK1MLs5Vv/s0Njakn8m5i7zc/znCIVxrd7hoGA==}
+  nara-sdk@1.0.81:
+    resolution: {integrity: sha512-p6noqW4ZfdvRU6EexdSlAVSxInPB9jUg6gNbpXdxIaiAh+7vLMXd+8FM2b58Zr3I7JQeAaG0V9SQvfH1oGhsIw==}
     peerDependencies:
       typescript: ^5
 
@@ -2873,7 +2873,7 @@ snapshots:
 
   nanoassert@2.0.0: {}
 
-  nara-sdk@1.0.78(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6):
+  nara-sdk@1.0.81(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6):
     dependencies:
       '@coral-xyz/anchor': 0.32.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
       '@solana/spl-token': 0.4.14(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6)

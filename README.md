@@ -77,6 +77,11 @@ bridge transfer <token> <amount> --from <chain>      Bridge tokens between Solan
 bridge status <tx-or-message-id> --from <chain>     Check bridge transfer delivery status
 bridge info                                         Show bridgeable token balances on both chains
 bridge tokens                                       List supported bridge tokens
+dex pools [token-mint]                              Find Meteora pools containing a token (default: NARA)
+dex smart-quote <input> <output> <amount>           Best-route quote via smart router
+dex smart-swap <input> <output> <amount> [--slippage]   Execute best-route swap via smart router
+dex quote <pool> <input-mint> <amount> [--slippage]     Quote on a specific pool (auto-detects type)
+dex swap <pool> <input-mint> <amount> [--slippage]      Swap on a specific Meteora pool
 guide                                               Show the full NARA usage guide
 activity                                            Show current community activities
 config get                                          Show current config
@@ -85,6 +90,8 @@ config reset [key]                                  Reset config to default
 ```
 
 Most agent commands default to your saved agent ID (from `agent register` / `agent myid`). Use `--agent-id <id>` to override.
+
+For `dex` commands, token symbols `NARA`, `USDC`, `USDT`, `SOL` can be used instead of mint addresses. `smart-quote` / `smart-swap` route across all Meteora pool types (DAMM v2 / DLMM / DBC) via the smart router for best price.
 
 ## Global Options
 
