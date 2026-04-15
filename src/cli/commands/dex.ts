@@ -177,6 +177,8 @@ async function handlePools(token: string, options: GlobalOptions) {
           ]);
           const amountX = reserves[0] ? Number(reserves[0].value.uiAmount ?? 0) : 0;
           const amountY = reserves[1] ? Number(reserves[1].value.uiAmount ?? 0) : 0;
+          // activeBin.price is price-per-lamport; convert to UI price (Y per X)
+          const uiPrice = Number(dlmm.fromPricePerLamport(Number(activeBin.price)));
           results.push({
             type: "DLMM",
             pool: dlmm.pubkey.toBase58(),
@@ -184,7 +186,7 @@ async function handlePools(token: string, options: GlobalOptions) {
             tokenB: dlmm.tokenY.publicKey.toBase58(),
             amountA: amountX,
             amountB: amountY,
-            price: Number(activeBin.price),
+            price: uiPrice,
           });
         } catch {}
       }
