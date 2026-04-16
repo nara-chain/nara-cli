@@ -125,10 +125,13 @@ async function handleQuestGet(options: GlobalOptions & { verbose?: boolean }) {
     round: quest.round,
     question: quest.question,
     difficulty: quest.difficulty,
-    rewardPerWinner: `${quest.rewardPerWinner} NARA`,
     totalReward: `${quest.totalReward} NARA`,
-    rewardSlots: `${quest.winnerCount}/${quest.rewardCount}`,
-    remainingRewardSlots: quest.remainingSlots,
+    stakeRewardPerWinner: `${quest.stakeRewardPerWinner} NARA`,
+    stakeRewardSlots: `${quest.stakeWinnerCount}/${quest.stakeRewardCount}`,
+    stakeRemainingSlots: quest.stakeRemainingSlots,
+    creditRewardPerWinner: `${quest.creditRewardPerWinner} NARA`,
+    creditRewardSlots: `${quest.creditWinnerCount}/${quest.creditRewardCount}`,
+    creditRemainingSlots: quest.creditRemainingSlots,
     deadline: new Date(quest.deadline * 1000).toLocaleString(),
     timeRemaining: formatTimeRemaining(quest.timeRemaining),
     expired: quest.expired,
@@ -147,10 +150,12 @@ async function handleQuestGet(options: GlobalOptions & { verbose?: boolean }) {
     console.log(`  Question: ${quest.question}`);
     console.log(`  Round: #${quest.round}`);
     console.log(`  Difficulty: ${quest.difficulty}`);
-    console.log(`  Reward per winner: ${quest.rewardPerWinner} NARA`);
     console.log(`  Total reward: ${quest.totalReward} NARA`);
     console.log(
-      `  Reward slots: ${quest.winnerCount}/${quest.rewardCount} (${quest.remainingSlots} remaining)`
+      `  Stake reward:  ${quest.stakeRewardPerWinner} NARA/winner, ${quest.stakeWinnerCount}/${quest.stakeRewardCount} (${quest.stakeRemainingSlots} remaining)`
+    );
+    console.log(
+      `  Credit reward: ${quest.creditRewardPerWinner} NARA/winner, ${quest.creditWinnerCount}/${quest.creditRewardCount} (${quest.creditRemainingSlots} remaining)`
     );
     if (stakeRequired) {
       console.log(`  Stake requirement: ${quest.effectiveStakeRequirement.toFixed(9).replace(/\.?0+$/, "")} NARA (decays ${quest.stakeHigh} → ${quest.stakeLow})`);
@@ -201,6 +206,7 @@ async function handleQuestConfig(options: GlobalOptions) {
     stakeBpsLow,
     decayMs: config.decayMs,
     minQuestInterval: config.minQuestInterval,
+    freeStakeMultiplier: config.freeStakeMultiplier,
   };
 
   if (options.json) {
@@ -215,6 +221,7 @@ async function handleQuestConfig(options: GlobalOptions) {
     console.log(`  Stake BPS Low:      ${stakeBpsLow / 100}% (${stakeBpsLow} BPS)`);
     console.log(`  Decay (ms):         ${data.decayMs}`);
     console.log(`  Min Quest Interval: ${data.minQuestInterval}s`);
+    console.log(`  Free Stake Multiplier: ${data.freeStakeMultiplier}x`);
     console.log("");
   }
 }
