@@ -155,7 +155,7 @@ async function handleQuestGet(options: GlobalOptions & { verbose?: boolean }) {
       `  Stake reward:  ${quest.stakeRewardPerWinner} NARA/winner, ${quest.stakeWinnerCount}/${quest.stakeRewardCount} (${quest.stakeRemainingSlots} remaining)`
     );
     console.log(
-      `  Credit reward: ${quest.creditRewardPerWinner} NARA/winner, ${quest.creditWinnerCount}/${quest.creditRewardCount} (${quest.creditRemainingSlots} remaining)`
+      `  Boost reward:  ${quest.creditRewardPerWinner} NARA/winner, ${quest.creditWinnerCount}/${quest.creditRewardCount} (${quest.creditRemainingSlots} remaining)`
     );
     if (stakeRequired) {
       console.log(`  Stake requirement: ${quest.effectiveStakeRequirement.toFixed(9).replace(/\.?0+$/, "")} NARA (decays ${quest.stakeHigh} → ${quest.stakeLow})`);
@@ -164,7 +164,7 @@ async function handleQuestGet(options: GlobalOptions & { verbose?: boolean }) {
     } else {
       console.log(`  Stake requirement: none`);
     }
-    console.log(`  Stake-free credits: ${freeCredits}`);
+    console.log(`  Boost credits: ${freeCredits}`);
     console.log(`  Deadline: ${new Date(quest.deadline * 1000).toLocaleString()}`);
     if (quest.timeRemaining > 0) {
       console.log(`  Time remaining: ${formatTimeRemaining(quest.timeRemaining)}`);
