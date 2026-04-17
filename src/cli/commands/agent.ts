@@ -264,13 +264,13 @@ async function handleAgentGet(agentId: string, options: GlobalOptions) {
         const hoursAgo = (Date.now() - lastRewarded) / (1000 * 60 * 60);
         if (hoursAgo >= 24) {
           const agoStr = hoursAgo >= 48 ? `${Math.floor(hoursAgo / 24)}d` : `${Math.floor(hoursAgo)}h`;
-          console.log(`  Tip: Last tweet verified ${agoStr} ago (>24h). You can submit a new tweet to earn more stake-free credits.`);
+          console.log(`  Tip: Last tweet verified ${agoStr} ago (>24h). You can submit a new tweet to earn more Boost PoMI credits.`);
         } else {
           const hoursLeft = Math.ceil(24 - hoursAgo);
           console.log(`  Tip: Next tweet verification available in ~${hoursLeft}h.`);
         }
       } else {
-        console.log(`  Tip: Submit a tweet to earn stake-free PoMI mining credits!`);
+        console.log(`  Tip: Submit a tweet to earn Boost PoMI credits (stake-free)!`);
       }
       const submitTweetText = randomSubmitTweet();
       const submitTweetIntent = `https://x.com/intent/tweet?text=${submitTweetText.replace(/ /g, "%20").replace(/#/g, "%23").replace(/"/g, "%22")}`;
@@ -278,12 +278,13 @@ async function handleAgentGet(agentId: string, options: GlobalOptions) {
       console.log(`  Link: ${submitTweetIntent}`);
       console.log(`  Then run: npx naracli agent submit-tweet <tweet-url>`);
       console.log(`  Credits are based on likes, bookmarks, retweets, and quotes.`);
+      console.log(`  Submit daily without breaking the streak to multiply your rewards!`);
       console.log("");
     } else {
       // Not bound — show bind tip
       const tweetText = randomBindTweet(agentId);
       const tweetIntent = `https://x.com/intent/tweet?text=${tweetText.replace(/ /g, "%20").replace(/#/g, "%23").replace(/"/g, "%22")}`;
-      console.log(`  Tip: Bind your X(Twitter) to earn 20 NARA + stake-free PoMI mining credits!`);
+      console.log(`  Tip: Bind your X(Twitter) to earn 20 NARA + Boost PoMI credits (stake-free)!`);
       console.log(`  1. Post a tweet with this content:`);
       console.log(`     ${tweetText}`);
       console.log(`     Link: ${tweetIntent}`);
@@ -945,7 +946,7 @@ Example:
           const tweetText = randomBindTweet(agentId);
           const tweetIntent = `https://x.com/intent/tweet?text=${tweetText.replace(/ /g, "%20").replace(/#/g, "%23").replace(/"/g, "%22")}`;
           console.log("");
-          console.log(`  Bind your X(Twitter) to earn 20 NARA + stake-free PoMI mining credits!`);
+          console.log(`  Bind your X(Twitter) to earn 20 NARA + Boost PoMI credits (stake-free)!`);
           console.log(`  1. Post a tweet with this content:`);
           console.log(`     ${tweetText}`);
           console.log(`     Link: ${tweetIntent}`);
