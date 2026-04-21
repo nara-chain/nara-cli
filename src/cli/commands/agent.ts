@@ -479,6 +479,44 @@ async function handleAgentLog(
   }
 }
 
+async function handleAgentRecover(agentId: string, options: GlobalOptions) {
+  validateName(agentId, "Agent ID");
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const wallet = await loadWallet(options.wallet);
+  const pubkey = wallet.publicKey.toBase58();
+
+  // Check if local config already has an agent ID for this wallet
+  const networkConfig = loadNetworkConfig(rpcUrl, pubkey);
+  if (networkConfig.agent_id) {
+    printError(`Agent ID "${networkConfig.agent_id}" is already saved locally for this wallet. Run "agent clear" first if you want to replace it.`);
+    process.exit(1);
+  }
+
+  const connection = new Connection(rpcUrl, "confirmed");
+
+  // Verify on-chain: agent exists and authority matches current wallet
+  let info;
+  try {
+    info = await getAgentInfo(connection, agentId);
+  } catch {
+    printError(`Agent "${agentId}" not found on-chain.`);
+    process.exit(1);
+  }
+  const authority = info.record.authority.toBase58();
+  if (authority !== pubkey) {
+    printError(`Wallet ${pubkey} is not the authority of agent "${agentId}" (actual authority: ${authority}).`);
+    process.exit(1);
+  }
+
+  setAgentId(agentId, rpcUrl, pubkey);
+
+  if (options.json) {
+    formatOutput({ recovered: true, agentId, authority: pubkey }, true);
+  } else {
+    printSuccess(`Agent ID "${agentId}" saved to local config.`);
+  }
+}
+
 async function handleAgentClear(options: GlobalOptions) {
   const rpcUrl = getRpcUrl(options.rpcUrl);
   let pubkey: string | undefined;
@@ -849,6 +887,20 @@ export function registerAgentCommands(program: Command): void {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
         await handleAgentConfig(globalOpts);
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // agent recover
+  agent
+    .command("recover <agent-id>")
+    .description("Recover an existing on-chain agent ID to local config (verifies wallet is the authority)")
+    .action(async (agentId: string, _opts: any, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleAgentRecover(agentId, globalOpts);
       } catch (error: any) {
         printError(error.message);
         process.exit(1);
