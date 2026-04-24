@@ -610,6 +610,13 @@ async function handleAgentSubmitTweet(agentId: string, tweetId: bigint, tweetUrl
   const connection = new Connection(rpcUrl, "confirmed");
   const wallet = await loadWallet(options.wallet);
 
+  // Require Twitter binding before submitting a tweet
+  const twitter = await getAgentTwitter(connection, agentId).catch(() => null);
+  if (!twitter) {
+    printError(`Agent "${agentId}" has not bound a Twitter account yet. Run "npx naracli agent bind-twitter" first.`);
+    process.exit(1);
+  }
+
   // Check if tweet has already been used
   const existing = await getTweetRecord(connection, tweetId);
   if (existing) {
