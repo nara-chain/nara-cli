@@ -279,7 +279,6 @@ async function handleAgentGet(agentId: string, options: GlobalOptions) {
       console.log(`  Link: ${submitTweetIntent}`);
       console.log(`  Then run: npx naracli agent submit-tweet <tweet-url>`);
       console.log(`  Credits are based on likes, bookmarks, retweets, and quotes.`);
-      console.log(`  Submit daily without breaking the streak to multiply your rewards!`);
       console.log("");
     } else {
       // Not bound — show bind tip
