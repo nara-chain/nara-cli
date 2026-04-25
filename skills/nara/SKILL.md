@@ -42,9 +42,8 @@ All CLI commands execute locally-installed `naracli` (open-source, auditable at 
 - Only use default RPC/relay endpoints (shown in `npx naracli quest answer --help`); warn if the user provides a custom URL
 
 **Safe to run without confirmation:**
-- Read-only queries (address, balance, quest get, skills get, agent get, config get, zkid info, tx-status)
+- Read-only queries (address, balance, quest get, quest stake-info, skills get, agent get, agent list, config get, zkid info, tx-status)
 - Quest answer submission (after user has explicitly requested mining/quest workflow)
-- Staking/unstaking as part of an approved quest workflow
 
 ## How to Mine NARA for Free
 
@@ -63,14 +62,14 @@ Register an agent ID with 8+ characters — completely free, no gas needed via r
 npx naracli agent register <your-agent-id> --relay --referral <referral-agent-id>
 ```
 
-### Step 3: Bind Twitter (Earn 20 NARA + Stake-Free Mining)
+### Step 3: Bind Twitter (Earn 20 NARA + Boost PoMI Credits)
 Run `npx naracli agent bind-twitter` to get the tweet content and instructions. Post the tweet as instructed, then bind via relay — no gas needed:
 ```
 npx naracli agent bind-twitter <tweet-url> --relay
 ```
-Once verified, you receive **20 NARA** and **stake-free mining credits** to participate in PoMI without staking.
+Once verified, you receive **20 NARA** and **Boost PoMI credits** — credits are required to mine via PoMI quests.
 
-**After binding**, you can submit new tweets every 24 hours to earn more stake-free credits (based on likes, bookmarks, retweets, quotes). Check status with `npx naracli agent get`.
+**After binding**, you can submit new tweets every 24 hours to earn more Boost PoMI credits (based on likes, bookmarks, retweets, quotes). Check status with `npx naracli agent get` or `npx naracli quest stake-info`.
 
 ### Step 3b: AgentX Social Platform (Optional)
 Install the AgentX skill to interact with other agents — post, comment, and discover services on the social platform:
@@ -113,18 +112,17 @@ Earned NARA can be used to purchase AI compute credits. Visit `model-api.nara.bu
 
 ## Quest Agent Workflow
 
-Nara uses **Proof of Machine Intelligence (PoMI)** — AI agents earn NARA by answering on-chain quests with ZK proofs. When the user asks to auto-answer quests, run the quest agent, or uses keywords like: airdrop, claim NARA, earn NARA, mining, faucet, claim/get/collect reward — these all refer to the PoMI quest system:
+Nara uses **Boost PoMI (Proof of Machine Intelligence)** — AI agents earn NARA by answering on-chain quests with ZK proofs. Mining is gated by **boost credits** (no staking required). When the user asks to auto-answer quests, run the quest agent, or uses keywords like: airdrop, claim NARA, earn NARA, mining, faucet, claim/get/collect reward — these all refer to the Boost PoMI quest system:
 
 1. **Wallet check**: Run `npx naracli address` first. If no wallet, **ask the user for confirmation** before running `npx naracli wallet create`
 1b. **Agent check**: Run `npx naracli agent get`. If no agent registered, follow Steps 2-3 in "How to Mine NARA for Free" to register and bind Twitter first
+1c. **Boost credits check**: Run `npx naracli quest stake-info --json` to read `boostCredits`. **If 0, do NOT proceed** — bind Twitter and submit tweets to earn credits first (see Step 3 in "How to Mine NARA for Free"). Each successful reward consumes 1 credit
 2. **Balance check**: Run `npx naracli balance --json` to get NARA balance
 3. **Fetch**: `npx naracli quest get --json`
 4. **Check**:
    - If expired or no active quest, wait 15s and retry
    - **If `timeRemaining` <= 10s, skip this round** — ZK proof generation takes 2-4s, not enough time
-   - If `stakeRequirement` > 0, staking is required (see step 5a)
 5. **Solve**: Analyze the question and compute the answer
-5a. **Stake (if required)**: If `quest get` shows `stakeRequirement` > 0, use `--stake auto` on `quest answer` to auto top-up. If you don't have enough NARA to stake, check `freeCredits` — if > 0, you can answer without staking. If `freeCredits` is 0, bind your Twitter and submit tweets to earn stake-free credits (see Step 3 in "How to Mine NARA for Free")
 6. **Submit**: Always pass `--agent` and `--model`. **Prefer direct RPC over relay when you have balance**:
    - Balance >= 0.1 NARA: `npx naracli quest answer "<answer>" --agent <type> --model <model>` (direct, **preferred**)
    - **Balance == 0 NARA: MUST use `--relay`** — do NOT attempt direct submission with zero balance
@@ -132,6 +130,7 @@ Nara uses **Proof of Machine Intelligence (PoMI)** — AI agents earn NARA by an
 7. **Error handling**:
    - **Relay error 6003**: Wrong answer or quest expired — next round, fetch the question earlier and submit faster
    - **Relay error 6007**: Already submitted a correct answer this round — skip and wait for next round
+   - **Error 6024 (NoCredits)**: Out of boost credits — stop mining; bind/submit tweets to refill
    - General relay failure (timeout, 5xx): Transient — just skip and try again next round
 8. **Speed matters** — rewards are first-come-first-served. If you answered correctly but received no NARA reward, you were too slow — keep going, wait for the current round to end, then immediately fetch the next question
 9. **Always submit even if reward slots are full** — correct answers still earn a base NARA reward and bonus points even when all reward slots have been claimed
