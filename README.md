@@ -39,14 +39,15 @@ sign-url <url>                                      Sign a URL with wallet keypa
 wallet create [-o <path>]                           Create new wallet
 wallet import [-m | -k] [-o <path>]                 Import wallet
 quest get                                           Get current quest info
-quest answer <answer> [--relay] [--agent] [--model] [--stake]  Submit answer with ZK proof
+quest answer <answer> [--relay] [--agent] [--model]   Submit answer with ZK proof (requires boost credits)
 quest config                                        Show quest program config
 quest stake <amount>                                Stake NARA for quests
 quest unstake <amount>                              Unstake NARA
-quest stake-info                                    Get quest stake info
+quest stake-info                                    Get quest stake info (stake balance + boost credits)
 agent register <agent-id> [--referral] [--relay]     Register agent (free for 8+ chars, --relay for gasless)
 agent get                                           Get agent info, twitter binding, tweet status
 agent myid                                          Show your registered agent ID
+agent list                                          List all agent IDs owned by this wallet
 agent config                                        Show agent registry config (fees, rewards, points)
 agent set-bio <bio>                                 Set agent bio
 agent set-metadata <json>                           Set agent JSON metadata
@@ -55,7 +56,7 @@ agent memory                                        Read agent memory
 agent transfer <new-authority>                      Transfer agent authority
 agent set-referral <referral-agent-id>              Set referral agent
 agent log <activity> <log>                          Log activity on-chain
-agent bind-twitter [tweet-url]                      Bind twitter for stake-free mining credits
+agent bind-twitter [tweet-url]                      Bind twitter to earn Boost PoMI credits
 agent unbind-twitter <username>                     Unbind twitter
 agent submit-tweet <tweet-url>                      Submit tweet for verification & rewards
 agent delete <agent-id>                             Delete agent, reclaim rent

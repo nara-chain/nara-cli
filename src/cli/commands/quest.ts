@@ -26,7 +26,6 @@ import {
   unstake as questUnstake,
   getStakeInfo,
   type ActivityLog,
-  type StakeInfo,
   type QuestOptions,
 } from "nara-sdk";
 import { loadNetworkConfig } from "../utils/agent-config";
@@ -59,6 +58,7 @@ const QUEST_ERRORS: Record<number, string> = {
   6009: "invalidMaxRewardCount",
   6010: "unstakeNotReady",
   6011: "insufficientStakeBalance",
+  6024: "noCredits",
 };
 
 function anchorErrorCode(err: any): string {
@@ -70,6 +70,9 @@ function anchorErrorCode(err: any): string {
   return "";
 }
 
+const STAKE_DEPRECATION_NOTICE =
+  "PoMI has been upgraded to Boost PoMI — mining is now gated by boost credits, not stake. The stake channel is being phased out; please unstake your NARA soon.";
+
 // ─── Helpers ─────────────────────────────────────────────────────
 function formatTimeRemaining(seconds: number): string {
   if (seconds <= 0) return "expired";
@@ -80,7 +83,7 @@ function formatTimeRemaining(seconds: number): string {
 }
 
 // ─── Command: quest get ──────────────────────────────────────────
-async function handleQuestGet(options: GlobalOptions & { verbose?: boolean }) {
+async function handleQuestGet(options: GlobalOptions) {
   const rpcUrl = getRpcUrl(options.rpcUrl);
   const connection = new Connection(rpcUrl, "confirmed");
 
@@ -107,15 +110,12 @@ async function handleQuestGet(options: GlobalOptions & { verbose?: boolean }) {
     return;
   }
 
-  // Stake is always required to answer quests
-  const stakeRequired = true;
-
-  // Fetch free credits (stake-free answer quota)
-  let freeCredits = 0;
+  // Fetch Boost PoMI credits (required to submit an answer)
+  let boostCredits = 0;
   try {
     const stakeInfo = await getStakeInfo(connection, wallet.publicKey);
     if (stakeInfo) {
-      freeCredits = stakeInfo.freeCredits;
+      boostCredits = stakeInfo.boostCredits;
     }
   } catch {
     // Ignore — wallet may not have a stake record
@@ -126,21 +126,13 @@ async function handleQuestGet(options: GlobalOptions & { verbose?: boolean }) {
     question: quest.question,
     difficulty: quest.difficulty,
     totalReward: `${quest.totalReward} NARA`,
-    stakeRewardPerWinner: `${quest.stakeRewardPerWinner} NARA`,
-    stakeRewardSlots: `${quest.stakeWinnerCount}/${quest.stakeRewardCount}`,
-    stakeRemainingSlots: quest.stakeRemainingSlots,
-    creditRewardPerWinner: `${quest.creditRewardPerWinner} NARA`,
-    creditRewardSlots: `${quest.creditWinnerCount}/${quest.creditRewardCount}`,
-    creditRemainingSlots: quest.creditRemainingSlots,
+    rewardPerWinner: `${quest.stakeRewardPerWinner} NARA`,
+    rewardSlots: `${quest.stakeWinnerCount}/${quest.stakeRewardCount}`,
+    remainingSlots: quest.stakeRemainingSlots,
     deadline: new Date(quest.deadline * 1000).toLocaleString(),
     timeRemaining: formatTimeRemaining(quest.timeRemaining),
     expired: quest.expired,
-    stakeRequired,
-    stakeRequirement: stakeRequired ? `${quest.effectiveStakeRequirement.toFixed(9).replace(/\.?0+$/, "")} NARA` : "0 NARA",
-    stakeHigh: `${quest.stakeHigh} NARA`,
-    stakeLow: `${quest.stakeLow} NARA`,
-    avgParticipantStake: `${quest.avgParticipantStake} NARA`,
-    freeCredits,
+    boostCredits,
   };
 
   if (options.json) {
@@ -152,19 +144,9 @@ async function handleQuestGet(options: GlobalOptions & { verbose?: boolean }) {
     console.log(`  Difficulty: ${quest.difficulty}`);
     console.log(`  Total reward: ${quest.totalReward} NARA`);
     console.log(
-      `  Stake reward:  ${quest.stakeRewardPerWinner} NARA/winner, ${quest.stakeWinnerCount}/${quest.stakeRewardCount} (${quest.stakeRemainingSlots} remaining)`
+      `  Boost PoMI reward: ${quest.stakeRewardPerWinner} NARA/winner, ${quest.stakeWinnerCount}/${quest.stakeRewardCount} (${quest.stakeRemainingSlots} remaining)`
     );
-    console.log(
-      `  Boost reward:  ${quest.creditRewardPerWinner} NARA/winner, ${quest.creditWinnerCount}/${quest.creditRewardCount} (${quest.creditRemainingSlots} remaining)`
-    );
-    if (stakeRequired) {
-      console.log(`  Stake requirement: ${quest.effectiveStakeRequirement.toFixed(9).replace(/\.?0+$/, "")} NARA (decays ${quest.stakeHigh} → ${quest.stakeLow})`);
-    } else if (options.verbose) {
-      console.log(`  Stake requirement: none (${quest.effectiveStakeRequirement.toFixed(9).replace(/\.?0+$/, "")} NARA, decays ${quest.stakeHigh} → ${quest.stakeLow})`);
-    } else {
-      console.log(`  Stake requirement: none`);
-    }
-    console.log(`  Boost credits: ${freeCredits}`);
+    console.log(`  Boost credits: ${boostCredits}${boostCredits === 0 ? " (required to answer — acquire credits first)" : ""}`);
     console.log(`  Deadline: ${new Date(quest.deadline * 1000).toLocaleString()}`);
     if (quest.timeRemaining > 0) {
       console.log(`  Time remaining: ${formatTimeRemaining(quest.timeRemaining)}`);
@@ -206,7 +188,6 @@ async function handleQuestConfig(options: GlobalOptions) {
     stakeBpsLow,
     decayMs: config.decayMs,
     minQuestInterval: config.minQuestInterval,
-    freeStakeMultiplier: config.freeStakeMultiplier,
   };
 
   if (options.json) {
@@ -221,7 +202,6 @@ async function handleQuestConfig(options: GlobalOptions) {
     console.log(`  Stake BPS Low:      ${stakeBpsLow / 100}% (${stakeBpsLow} BPS)`);
     console.log(`  Decay (ms):         ${data.decayMs}`);
     console.log(`  Min Quest Interval: ${data.minQuestInterval}s`);
-    console.log(`  Free Stake Multiplier: ${data.freeStakeMultiplier}x`);
     console.log("");
   }
 }
@@ -229,7 +209,7 @@ async function handleQuestConfig(options: GlobalOptions) {
 // ─── Command: quest answer ───────────────────────────────────────
 async function handleQuestAnswer(
   answer: string,
-  options: GlobalOptions & { relay?: string; agent?: string; model?: string; referral?: string; stake?: string }
+  options: GlobalOptions & { relay?: string; agent?: string; model?: string; referral?: string }
 ) {
   const rpcUrl = getRpcUrl(options.rpcUrl);
   const connection = new Connection(rpcUrl, "confirmed");
@@ -315,8 +295,7 @@ async function handleQuestAnswer(
       if (configAgentId) {
         activityLog = { agentId: configAgentId, activity: "PoMI", model, log: "", referralAgentId: referral };
       }
-      const stakeOpt = options.stake === "auto" ? "auto" : options.stake ? parseFloat(options.stake) : undefined;
-      const result = await submitAnswer(connection, wallet, proof.solana, agent, model, stakeOpt !== undefined ? { stake: stakeOpt } : undefined, activityLog);
+      const result = await submitAnswer(connection, wallet, proof.solana, agent, model, undefined, activityLog);
       printSuccess("Answer submitted!");
       console.log(`  Transaction: ${result.signature}`);
       await handleReward(connection, result.signature, options);
@@ -338,12 +317,13 @@ async function handleQuestStake(amount: string, options: GlobalOptions) {
     process.exit(1);
   }
 
+  if (!options.json) printWarning(STAKE_DEPRECATION_NOTICE);
   if (!options.json) printInfo(`Staking ${n} NARA...`);
   const signature = await questStake(connection, wallet, n);
   if (!options.json) printSuccess(`Staked ${n} NARA!`);
 
   if (options.json) {
-    formatOutput({ amount: n, signature }, true);
+    formatOutput({ amount: n, signature, notice: STAKE_DEPRECATION_NOTICE }, true);
   } else {
     console.log(`  Transaction: ${signature}`);
   }
@@ -361,12 +341,13 @@ async function handleQuestUnstake(amount: string, options: GlobalOptions) {
     process.exit(1);
   }
 
+  if (!options.json) printWarning(STAKE_DEPRECATION_NOTICE);
   if (!options.json) printInfo(`Unstaking ${n} NARA...`);
   const signature = await questUnstake(connection, wallet, n);
   if (!options.json) printSuccess(`Unstaked ${n} NARA!`);
 
   if (options.json) {
-    formatOutput({ amount: n, signature }, true);
+    formatOutput({ amount: n, signature, notice: STAKE_DEPRECATION_NOTICE }, true);
   } else {
     console.log(`  Transaction: ${signature}`);
   }
@@ -389,12 +370,20 @@ async function handleQuestStakeInfo(options: GlobalOptions) {
   }
 
   if (options.json) {
-    formatOutput({ staked: true, amount: stakeInfo.amount, stakeRound: stakeInfo.stakeRound }, true);
+    formatOutput({
+      staked: true,
+      amount: stakeInfo.amount,
+      stakeRound: stakeInfo.stakeRound,
+      boostCredits: stakeInfo.boostCredits,
+      notice: stakeInfo.amount > 0 ? STAKE_DEPRECATION_NOTICE : undefined,
+    }, true);
   } else {
     console.log("");
     console.log(`  Staked: ${stakeInfo.amount} NARA`);
     console.log(`  Stake round: ${stakeInfo.stakeRound}`);
+    console.log(`  Boost credits: ${stakeInfo.boostCredits}`);
     console.log("");
+    if (stakeInfo.amount > 0) printWarning(STAKE_DEPRECATION_NOTICE);
   }
 }
 
@@ -464,6 +453,9 @@ function handleSubmitError(err: any) {
     case "insufficientStakeBalance":
       printError("Unstake amount exceeds staked balance");
       break;
+    case "noCredits":
+      printError("Boost PoMI requires boost credits. Acquire credits before submitting an answer.");
+      break;
     default:
       printError(`Failed to submit answer: ${err.message ?? String(err)}`);
       if (err.logs) {
@@ -483,12 +475,11 @@ export function registerQuestCommands(program: Command): void {
   // quest get
   quest
     .command("get")
-    .description("Get current quest info (question, deadline, difficulty, stake requirement)")
-    .option("-v, --verbose", "Show stake details even when not required")
-    .action(async (opts: any, cmd: Command) => {
+    .description("Get current quest info (question, deadline, difficulty, boost credits)")
+    .action(async (_opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
-        await handleQuestGet({ ...globalOpts, verbose: opts.verbose });
+        await handleQuestGet(globalOpts);
       } catch (error: any) {
         printError(error.message);
         process.exit(1);
@@ -498,18 +489,16 @@ export function registerQuestCommands(program: Command): void {
   // quest answer
   quest
     .command("answer <answer>")
-    .description("Submit a quest answer with ZK proof. Generates a proof locally and submits on-chain. Use --relay when balance is 0 (gasless). Always pass --agent and --model for reward tracking.")
+    .description("Submit a quest answer with ZK proof. Requires boost credits. Use --relay when balance is 0 (gasless). Always pass --agent and --model for reward tracking.")
     .option("--relay [url]", `Submit via gasless relay (default: ${DEFAULT_QUEST_RELAY_URL}, backup: https://quest2-api.nara.build/)`)
     .option("--agent <name>", "Agent/platform type: claude-code, cursor, chatgpt, openclaw, etc. (default: naracli)")
     .option("--model <name>", "AI model used: claude-opus-4-6, claude-sonnet-4-6, gpt-4o, etc.")
     .option("--referral <agent-id>", "Referral agent ID for earning referral points")
-    .option("--stake [amount]", 'Stake NARA in the same tx ("auto" to top-up to requirement, or an exact amount)')
     .action(async (answer: string, opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
         const relayUrl = opts.relay === true ? DEFAULT_QUEST_RELAY_URL : opts.relay;
-        const stakeVal = opts.stake === true ? "auto" : opts.stake;
-        await handleQuestAnswer(answer, { ...globalOpts, relay: relayUrl, agent: opts.agent, model: opts.model, referral: opts.referral, stake: stakeVal });
+        await handleQuestAnswer(answer, { ...globalOpts, relay: relayUrl, agent: opts.agent, model: opts.model, referral: opts.referral });
       } catch (error: any) {
         printError(error.message);
         process.exit(1);
@@ -519,7 +508,7 @@ export function registerQuestCommands(program: Command): void {
   // quest config
   quest
     .command("config")
-    .description("Show quest program config (reward counts, stake params, decay, intervals)")
+    .description("Show quest program config (reward counts, decay, intervals)")
     .action(async (_opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
@@ -561,7 +550,7 @@ export function registerQuestCommands(program: Command): void {
   // quest stake-info
   quest
     .command("stake-info")
-    .description("Get your current quest stake info")
+    .description("Get your current quest stake info (stake balance + boost credits)")
     .action(async (_opts: any, cmd: Command) => {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;

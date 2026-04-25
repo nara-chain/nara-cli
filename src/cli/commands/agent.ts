@@ -18,6 +18,7 @@ import {
   registerAgent,
   registerAgentWithReferral,
   getAgentInfo,
+  listAgentsByAuthority,
   getAgentMemory,
   setBio,
   setMetadata,
@@ -517,6 +518,35 @@ async function handleAgentRecover(agentId: string, options: GlobalOptions) {
   }
 }
 
+async function handleAgentList(options: GlobalOptions) {
+  const rpcUrl = getRpcUrl(options.rpcUrl);
+  const wallet = await loadWallet(options.wallet);
+  const connection = new Connection(rpcUrl, "confirmed");
+
+  const agentIds = await listAgentsByAuthority(connection, wallet.publicKey);
+
+  if (options.json) {
+    formatOutput({ authority: wallet.publicKey.toBase58(), count: agentIds.length, agentIds }, true);
+    return;
+  }
+
+  if (agentIds.length === 0) {
+    printWarning(`No agents found for ${wallet.publicKey.toBase58()}`);
+    return;
+  }
+
+  const networkConfig = loadNetworkConfig(rpcUrl, wallet.publicKey.toBase58());
+  const savedId = networkConfig.agent_id;
+
+  console.log("");
+  console.log(`  Authority: ${wallet.publicKey.toBase58()}`);
+  console.log(`  Agents (${agentIds.length}):`);
+  for (const id of agentIds) {
+    console.log(`    - ${id}${id === savedId ? "  (saved locally)" : ""}`);
+  }
+  console.log("");
+}
+
 async function handleAgentClear(options: GlobalOptions) {
   const rpcUrl = getRpcUrl(options.rpcUrl);
   let pubkey: string | undefined;
@@ -908,6 +938,20 @@ export function registerAgentCommands(program: Command): void {
       try {
         const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
         await handleAgentRecover(agentId, globalOpts);
+      } catch (error: any) {
+        printError(error.message);
+        process.exit(1);
+      }
+    });
+
+  // agent list
+  agent
+    .command("list")
+    .description("List all agent IDs registered to this wallet's authority")
+    .action(async (_opts: any, cmd: Command) => {
+      try {
+        const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
+        await handleAgentList(globalOpts);
       } catch (error: any) {
         printError(error.message);
         process.exit(1);
