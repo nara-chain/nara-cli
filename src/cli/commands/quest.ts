@@ -126,9 +126,9 @@ async function handleQuestGet(options: GlobalOptions) {
     question: quest.question,
     difficulty: quest.difficulty,
     totalReward: `${quest.totalReward} NARA`,
-    rewardPerWinner: `${quest.stakeRewardPerWinner} NARA`,
-    rewardSlots: `${quest.stakeWinnerCount}/${quest.stakeRewardCount}`,
-    remainingSlots: quest.stakeRemainingSlots,
+    rewardPerWinner: `${quest.boostRewardPerWinner} NARA`,
+    rewardSlots: `${quest.boostWinnerCount}/${quest.boostRewardCount}`,
+    remainingSlots: quest.boostRemainingSlots,
     deadline: new Date(quest.deadline * 1000).toLocaleString(),
     timeRemaining: formatTimeRemaining(quest.timeRemaining),
     expired: quest.expired,
@@ -144,7 +144,7 @@ async function handleQuestGet(options: GlobalOptions) {
     console.log(`  Difficulty: ${quest.difficulty}`);
     console.log(`  Total reward: ${quest.totalReward} NARA`);
     console.log(
-      `  Boost PoMI reward: ${quest.stakeRewardPerWinner} NARA/winner, ${quest.stakeWinnerCount}/${quest.stakeRewardCount} (${quest.stakeRemainingSlots} remaining)`
+      `  Boost PoMI reward: ${quest.boostRewardPerWinner} NARA/winner, ${quest.boostWinnerCount}/${quest.boostRewardCount} (${quest.boostRemainingSlots} remaining)`
     );
     console.log(`  Boost credits: ${boostCredits}${boostCredits === 0 ? " (required to answer — acquire credits first)" : ""}`);
     console.log(`  Deadline: ${new Date(quest.deadline * 1000).toLocaleString()}`);
